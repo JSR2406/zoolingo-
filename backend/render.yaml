@@ -1,0 +1,21 @@
+# ZooLingo Backend Render Configuration
+# https://render.com/docs/yaml-spec
+
+services:
+  - type: web
+    name: zoolingo-backend
+    runtime: python
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: DEBUG
+        value: "false"
+      - key: ENVIRONMENT
+        value: "production"
+      - key: ALLOWED_ORIGINS
+        value: "https://zoolingo.vercel.app,https://zoolingo-*.vercel.app"
+      - key: MURF_API_KEY
+        sync: false  # Set this manually in Render dashboard for TTS
+    healthCheckPath: /health

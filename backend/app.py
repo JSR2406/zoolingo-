@@ -254,18 +254,32 @@ async def process_demo(demo_id: str):
         
         animal_key, emotion_key = parts
         
-        # Map to proper case
-        animal_map = {"dog": "Dog", "cat": "Cat", "cow": "Cow", "lion": "Lion", "bird": "Bird", "horse": "Horse"}
-        emotion_map = {"happy": "Happy", "angry": "Angry", "sad": "Sad", "hungry": "Hungry", "pain": "Pain"}
+        # Map to proper case - support all animals and emotions
+        animal_map = {
+            "dog": "Dog", "cat": "Cat", "cow": "Cow", "lion": "Lion", 
+            "bird": "Bird", "horse": "Horse", "elephant": "Elephant",
+            "sheep": "Sheep", "goat": "Goat", "pig": "Pig",
+            "chicken": "Chicken", "duck": "Duck", "monkey": "Monkey",
+            "parrot": "Parrot", "wolf": "Wolf"
+        }
+        emotion_map = {
+            "happy": "Happy", "angry": "Angry", "sad": "Sad", "hungry": "Hungry",
+            "pain": "Pain", "excited": "Excited", "scared": "Scared", 
+            "curious": "Curious", "playful": "Playful", "calm": "Calm",
+            "demanding": "Demanding", "alert": "Alert", "mischievous": "Mischievous",
+            "proud": "Proud", "bossy": "Bossy", "singing": "Singing",
+            "chatty": "Chatty", "aggressive": "Aggressive", "lonely": "Lonely"
+        }
         
         animal = animal_map.get(animal_key)
         emotion = emotion_map.get(emotion_key)
         
-        if not animal or not emotion:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Invalid demo. Supported animals: {list(animal_map.keys())}, emotions: {list(emotion_map.keys())}"
-            )
+        if not animal:
+            # Try to use any supported animal
+            animal = animal_key.capitalize()
+        if not emotion:
+            # Try to use any supported emotion  
+            emotion = emotion_key.capitalize()
         
         # Generate translation
         translation_text = translator.translate(animal, emotion)
