@@ -8,10 +8,11 @@ import shutil
 import uuid
 from datetime import datetime
 from typing import Optional
+import random
 
 from config import config
 from services.audio_processor import load_and_preprocess_audio
-from services.ai_classifier import classifier
+from services.ai_classifier import classifier, ANIMALS, EMOTIONS
 from services.nlp_translator import translator
 from services.murf_integration import murf_client
 
@@ -31,16 +32,26 @@ except ValueError as e:
 # Initialize FastAPI app
 app = FastAPI(
     title="ZooLingo API",
-    description="Production-ready backend for ZooLingo Voice Agent",
+    description="Production-ready backend for ZooLingo Voice Agent - Translates animal sounds to human language",
     version="1.0.0",
     docs_url="/docs" if config.ENVIRONMENT != "production" else None,
     redoc_url="/redoc" if config.ENVIRONMENT != "production" else None
 )
 
-# CORS Setup
+# CORS Setup - Allow frontend origins
+allowed_origins = config.ALLOWED_ORIGINS
+if "*" not in allowed_origins:
+    # Add common development origins
+    allowed_origins.extend([
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+    ])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.ALLOWED_ORIGINS,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,7 +80,14 @@ async def root():
         "message": "ZooLingo API is running",
         "status": "active",
         "version": "1.0.0",
-        "environment": config.ENVIRONMENT
+        "environment": config.ENVIRONMENT,
+        "endpoints": {
+            "health": "/health",
+            "docs": "/docs" if config.ENVIRONMENT != "production" else "disabled",
+            "process_audio": "/api/process-audio",
+            "demo": "/api/demo/{demo_id}",
+            "config": "/api/config"
+        }
     }
 
 @app.get("/health")
@@ -100,7 +118,9 @@ async def get_config():
         "environment": config.ENVIRONMENT,
         "max_upload_size_mb": config.MAX_UPLOAD_SIZE / (1024 * 1024),
         "allowed_extensions": list(config.ALLOWED_EXTENSIONS),
-        "murf_configured": bool(config.MURF_API_KEY)
+        "murf_configured": bool(config.MURF_API_KEY),
+        "supported_animals": translator.get_supported_animals(),
+        "supported_emotions": translator.get_supported_emotions()
     }
 
 def validate_file_extension(filename: str) -> bool:
@@ -168,19 +188,22 @@ async def process_audio(file: UploadFile = File(...)):
         
         # 4. Generate Speech (Murf)
         audio_url = None
-        logger.info("Generating TTS with Murf...")
-        audio_content = murf_client.generate_speech(translation_text)
-        
-        if audio_content:
-            output_audio_filename = f"response_{filename}.mp3"
-            output_audio_path = os.path.join(config.UPLOAD_DIR, output_audio_filename)
+        if config.MURF_API_KEY:
+            logger.info("Generating TTS with Murf...")
+            audio_content = murf_client.generate_speech(translation_text)
             
-            with open(output_audio_path, "wb") as f:
-                f.write(audio_content)
-            audio_url = f"/static/{output_audio_filename}"
-            logger.info(f"TTS audio generated: {audio_url}")
+            if audio_content:
+                output_audio_filename = f"response_{filename}.mp3"
+                output_audio_path = os.path.join(config.UPLOAD_DIR, output_audio_filename)
+                
+                with open(output_audio_path, "wb") as f:
+                    f.write(audio_content)
+                audio_url = f"/static/{output_audio_filename}"
+                logger.info(f"TTS audio generated: {audio_url}")
+            else:
+                logger.warning("TTS generation failed")
         else:
-            logger.warning("TTS generation failed or is mocked")
+            logger.info("Murf API key not configured, skipping TTS")
         
         # Cleanup input file
         if file_path and os.path.exists(file_path):
@@ -213,6 +236,86 @@ async def process_audio(file: UploadFile = File(...)):
             content={"status": "error", "message": "Internal server error"},
             status_code=500
         )
+
+# Demo endpoint for testing without actual audio
+@app.post("/api/demo/{demo_id}")
+async def process_demo(demo_id: str):
+    """
+    Process a demo sound without actual audio file.
+    Useful for demonstrations and testing.
+    """
+    try:
+        logger.info(f"Processing demo: {demo_id}")
+        
+        # Parse demo_id (format: "animal-emotion", e.g., "dog-happy")
+        parts = demo_id.lower().split("-")
+        if len(parts) != 2:
+            raise HTTPException(status_code=400, detail="Invalid demo ID format. Use 'animal-emotion'")
+        
+        animal_key, emotion_key = parts
+        
+        # Map to proper case
+        animal_map = {"dog": "Dog", "cat": "Cat", "cow": "Cow", "lion": "Lion", "bird": "Bird", "horse": "Horse"}
+        emotion_map = {"happy": "Happy", "angry": "Angry", "sad": "Sad", "hungry": "Hungry", "pain": "Pain"}
+        
+        animal = animal_map.get(animal_key)
+        emotion = emotion_map.get(emotion_key)
+        
+        if not animal or not emotion:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid demo. Supported animals: {list(animal_map.keys())}, emotions: {list(emotion_map.keys())}"
+            )
+        
+        # Generate translation
+        translation_text = translator.translate(animal, emotion)
+        confidence = round(random.uniform(0.85, 0.98), 2)
+        
+        # Generate TTS if configured
+        audio_url = None
+        if config.MURF_API_KEY:
+            logger.info("Generating TTS with Murf...")
+            audio_content = murf_client.generate_speech(translation_text)
+            
+            if audio_content:
+                output_filename = f"demo_{demo_id}_{uuid.uuid4().hex[:8]}.mp3"
+                output_path = os.path.join(config.UPLOAD_DIR, output_filename)
+                
+                with open(output_path, "wb") as f:
+                    f.write(audio_content)
+                audio_url = f"/static/{output_filename}"
+                logger.info(f"Demo TTS generated: {audio_url}")
+        
+        return JSONResponse(content={
+            "status": "success",
+            "message": "Demo processed successfully",
+            "data": {
+                "animal": animal,
+                "emotion": emotion,
+                "confidence": confidence,
+                "translation": translation_text,
+                "audio_url": audio_url,
+                "demo_mode": True
+            }
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing demo: {str(e)}", exc_info=True)
+        return JSONResponse(
+            content={"status": "error", "message": "Internal server error"},
+            status_code=500
+        )
+
+# Get supported animals and emotions
+@app.get("/api/supported")
+async def get_supported():
+    """Get list of supported animals and emotions"""
+    return {
+        "animals": translator.get_supported_animals(),
+        "emotions": translator.get_supported_emotions()
+    }
 
 # Serve static files for audio playback
 app.mount("/static", StaticFiles(directory=config.UPLOAD_DIR), name="static")
