@@ -16,3 +16,15 @@
 2026-01-15 15:38:41,611 - __main__ - INFO - Response: 200 - Duration: 1.68s
 2026-01-15 15:39:20,482 - __main__ - INFO - Configuration validated successfully
 2026-01-15 15:39:20,550 - __main__ - INFO - Starting ZooLingo API in development mode
+2026-01-15 15:40:33,129 - __main__ - INFO - Request: POST /api/demo/cat-angry
+2026-01-15 15:40:33,132 - __main__ - INFO - Processing demo: cat-angry
+2026-01-15 15:40:33,132 - __main__ - INFO - Generating TTS with Murf...
+2026-01-15 15:40:33,133 - services.murf_integration - INFO - Calling Murf API (attempt 1/3)...
+2026-01-15 15:40:34,177 - services.murf_integration - ERROR - Murf API authentication failed - check API key
+2026-01-15 15:40:34,180 - __main__ - INFO - Response: 200 - Duration: 1.05s
+2026-01-15 15:44:26,262 - __main__ - INFO - Request: POST /api/process-audio
+2026-01-15 15:44:26,274 - __main__ - INFO - Processing audio file: recording.webm
+2026-01-15 15:44:26,275 - __main__ - INFO - Response: 400 - Duration: 0.01s
+2026-01-15 16:31:16,491 - __main__ - INFO - Request: POST /api/process-audio
+2026-01-15 16:31:16,501 - __main__ - INFO - Processing audio file: recording.webm
+2026-01-15 16:31:16,501 - __main__ - INFO - Response: 400 - Duration: 0.01s
