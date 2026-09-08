@@ -17,6 +17,10 @@ class Config:
     # API Keys
     MURF_API_KEY = os.getenv("MURF_API_KEY")
     DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
+    SARVAM_API_KEY = os.getenv("SARVAM_API_KEY")
+    USE_SARVAM = os.getenv("USE_SARVAM", "True").lower() in ("true", "1", "yes")
+    SARVAM_LANGUAGE = os.getenv("SARVAM_LANGUAGE", "hi-IN")
+    SARVAM_VOICE_ID = os.getenv("SARVAM_VOICE_ID", "shubh")
     
     # CORS
     ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
@@ -37,8 +41,8 @@ class Config:
         """Validate critical configuration"""
         errors = []
         
-        if not cls.MURF_API_KEY:
-            errors.append("MURF_API_KEY is not set")
+        if not cls.MURF_API_KEY and not cls.SARVAM_API_KEY:
+            errors.append("No TTS API key configured (MURF_API_KEY or SARVAM_API_KEY)")
         
         if cls.ENVIRONMENT == "production":
             if cls.ALLOWED_ORIGINS == ["*"]:

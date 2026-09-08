@@ -4,6 +4,12 @@ __pycache__/
 *$py.class
 venv/
 .env
+*.log
+temp_uploads/
+backend/temp/
+*.mp3
+*.wav
+*.h5
 
 # Node
 node_modules/

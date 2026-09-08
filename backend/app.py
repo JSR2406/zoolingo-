@@ -15,6 +15,10 @@ from services.audio_processor import load_and_preprocess_audio
 from services.ai_classifier import classifier, ANIMALS, EMOTIONS
 from services.nlp_translator import translator
 from services.murf_integration import murf_client
+from services.sarvam_integration import SarvamTTSClient
+
+# Initialize SARVAM TTS client (primary)
+sarvam_client = SarvamTTSClient()
 
 # Setup logging
 config.setup_logging()
@@ -98,6 +102,7 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "services": {
             "api": "operational",
+            "sarvam_integration": "operational" if config.SARVAM_API_KEY else "degraded",
             "murf_integration": "operational" if config.MURF_API_KEY else "degraded",
             "classifier": "operational"
         }
@@ -118,6 +123,8 @@ async def get_config():
         "environment": config.ENVIRONMENT,
         "max_upload_size_mb": config.MAX_UPLOAD_SIZE / (1024 * 1024),
         "allowed_extensions": list(config.ALLOWED_EXTENSIONS),
+        "sarvam_configured": bool(config.SARVAM_API_KEY),
+        "sarvam_language": config.SARVAM_LANGUAGE,
         "murf_configured": bool(config.MURF_API_KEY),
         "supported_animals": translator.get_supported_animals(),
         "supported_emotions": translator.get_supported_emotions()
@@ -127,6 +134,30 @@ def validate_file_extension(filename: str) -> bool:
     """Validate file extension"""
     ext = filename.split(".")[-1].lower()
     return ext in config.ALLOWED_EXTENSIONS
+
+def generate_tts_audio(text: str) -> Optional[bytes]:
+    """Generate TTS audio using SARVAM (primary) or Murf (fallback)"""
+    # SARVAM is primary TTS
+    if getattr(config, 'USE_SARVAM', True) and sarvam_client.api_key:
+        logger.info("Generating TTS with SARVAM (primary)...")
+        result = sarvam_client.generate_speech(
+            text=text,
+            language_code="hi-IN",
+            speaker="shubh",
+            save_path=os.path.join(config.UPLOAD_DIR, "temp_sarvam.mp3")
+        )
+        if result['success'] and result.get('audio_data'):
+            return result['audio_data']
+        else:
+            logger.warning(f"SARVAM TTS failed: {result.get('error')}")
+    
+    # Fallback to Murf
+    if config.MURF_API_KEY:
+        logger.info("Generating TTS with Murf (fallback)...")
+        audio_content = murf_client.generate_speech(text)
+        return audio_content
+    
+    return None
 
 @app.post("/api/process-audio")
 async def process_audio(file: UploadFile = File(...)):
@@ -186,11 +217,11 @@ async def process_audio(file: UploadFile = File(...)):
         logger.info("Generating translation...")
         translation_text = translator.translate(animal, emotion)
         
-        # 4. Generate Speech (Murf)
+        # 4. Generate Speech (SARVAM primary, Murf fallback)
         audio_url = None
-        if config.MURF_API_KEY:
-            logger.info("Generating TTS with Murf...")
-            audio_content = murf_client.generate_speech(translation_text)
+        if sarvam_client.api_key or config.MURF_API_KEY:
+            logger.info("Generating TTS audio...")
+            audio_content = generate_tts_audio(translation_text)
             
             if audio_content:
                 output_audio_filename = f"response_{filename}.mp3"
@@ -203,7 +234,7 @@ async def process_audio(file: UploadFile = File(...)):
             else:
                 logger.warning("TTS generation failed")
         else:
-            logger.info("Murf API key not configured, skipping TTS")
+            logger.info("No TTS API key configured, skipping TTS")
         
         # Cleanup input file
         if file_path and os.path.exists(file_path):
@@ -285,11 +316,11 @@ async def process_demo(demo_id: str):
         translation_text = translator.translate(animal, emotion)
         confidence = round(random.uniform(0.85, 0.98), 2)
         
-        # Generate TTS if configured
+        # Generate TTS if configured (SARVAM primary, Murf fallback)
         audio_url = None
-        if config.MURF_API_KEY:
-            logger.info("Generating TTS with Murf...")
-            audio_content = murf_client.generate_speech(translation_text)
+        if sarvam_client.api_key or config.MURF_API_KEY:
+            logger.info("Generating TTS audio...")
+            audio_content = generate_tts_audio(translation_text)
             
             if audio_content:
                 output_filename = f"demo_{demo_id}_{uuid.uuid4().hex[:8]}.mp3"
