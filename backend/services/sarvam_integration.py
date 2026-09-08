@@ -8,54 +8,23 @@ import requests
 import os
 import time
 import base64
+from pathlib import Path
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 class SarvamTTSClient:
-    """Client for SARVAM Text-to-Speech API (Bulbul v3)"""
+    """Client for SARVAM Text-to-Speech API (Bulbul v3) - English/Hindi MVP"""
 
     BASE_URL = "https://api.sarvam.ai"
 
-    # Available Indian language voice speakers (bulbul:v3)
+    # Available voice speakers (bulbul:v3) - English + Hindi only for the MVP
     SPEAKERS = {
         'hindi': {
             'female': 'ritu',
             'male': 'shubh',
             'child': 'tanya'
-        },
-        'tamil': {
-            'female': 'kavitha',
-            'male': 'gokul'
-        },
-        'bengali': {
-            'female': 'sweta',
-            'male': 'amit'
-        },
-        'marathi': {
-            'female': 'priya',
-            'male': 'aditya'
-        },
-        'gujarati': {
-            'female': 'pooja',
-            'male': 'rahul'
-        },
-        'telugu': {
-            'female': 'kavya',
-            'male': 'rohan'
-        },
-        'kannada': {
-            'female': 'shreya',
-            'male': 'varun'
-        },
-        'malayalam': {
-            'female': 'ishita',
-            'male': 'sumit'
-        },
-        'punjabi': {
-            'female': 'simran',
-            'male': 'dev'
         },
         'english': {
             'female': 'neha',
@@ -63,19 +32,10 @@ class SarvamTTSClient:
         }
     }
 
-    # BCP-47 language codes
+    # BCP-47 language codes - English + Hindi only for the MVP
     LANGUAGE_CODES = {
         'hindi': 'hi-IN',
-        'tamil': 'ta-IN',
-        'bengali': 'bn-IN',
-        'marathi': 'mr-IN',
-        'gujarati': 'gu-IN',
-        'telugu': 'te-IN',
-        'kannada': 'kn-IN',
-        'malayalam': 'ml-IN',
-        'punjabi': 'pa-IN',
-        'english': 'en-IN',
-        'odia': 'od-IN'
+        'english': 'en-IN'
     }
 
     def __init__(
@@ -213,6 +173,27 @@ class SarvamTTSClient:
             'total_characters': self.usage_stats['total_characters'],
             'total_cost_inr': round(self.usage_stats['total_cost_inr'], 4)
         }
+
+
+# Focused voices per language for the MVP (Bulbul v3).
+# Hindi: male=shubh, female=ritu, child=tanya; English: female=neha, male=rohan.
+VOICES_BY_LANGUAGE = {
+    'hi-IN': ['shubh', 'ritu', 'tanya'],
+    'en-IN': ['neha', 'rohan'],
+}
+
+DEFAULT_VOICES = {
+    'hi-IN': 'shubh',
+    'en-IN': 'neha',
+}
+
+
+def validate_speaker(speaker, language_code='hi-IN'):
+    """Return a valid speaker for the given language (falls back to the default)."""
+    allowed = VOICES_BY_LANGUAGE.get(language_code, [])
+    if speaker and speaker in allowed:
+        return speaker
+    return DEFAULT_VOICES.get(language_code, 'shubh')
 
 
 # Example usage

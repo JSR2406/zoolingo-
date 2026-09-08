@@ -10,17 +10,27 @@ export default defineConfig({
         proxy: {
             // Proxy API requests to backend during development
             '/api': {
-                target: 'http://localhost:8000',
+                target: 'http://localhost:8001',
                 changeOrigin: true,
                 secure: false,
             },
             '/static': {
-                target: 'http://localhost:8000',
+                target: 'http://localhost:8001',
+                changeOrigin: true,
+                secure: false,
+            },
+            '/demo-audio': {
+                target: 'http://localhost:8001',
+                changeOrigin: true,
+                secure: false,
+            },
+            '/elevenlabs': {
+                target: 'http://localhost:8001',
                 changeOrigin: true,
                 secure: false,
             },
             '/health': {
-                target: 'http://localhost:8000',
+                target: 'http://localhost:8001',
                 changeOrigin: true,
                 secure: false,
             },

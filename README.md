@@ -1,24 +1,52 @@
 # ZooLingo 🐾 - Voice Agent for Animals
 
-**Built for Techfest, IIT Bombay | Murf Voice Agent Hackathon**
+**Built for Techfest, IIT Bombay | SARVAM AI Voice + LLM Hackathon**
 
 [![CI/CD](https://github.com/yourusername/zoolingo/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/yourusername/zoolingo/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)]()
 
-ZooLingo is a **production-ready** voice-first AI agent that translates live animal vocalizations into actionable, natural human language and responds instantly with lifelike speech using **Murf Falcon TTS**.
+ZooLingo is a **production-ready** voice-first AI agent that translates live animal vocalizations into actionable, natural human language and responds instantly with lifelike speech using **SARVAM Bulbul v3 TTS** and **Sarvam-105B** for multilingual translation.
 
 ![ZooLingo Demo](demo/demo-video.mp4) *(Link to demo video)*
 
 ## 🚀 Features
 
 ### Core Functionality
-- **Real-time Audio Processing**: Captures and analyzes animal sounds with librosa
-- **Emotion & Intent Classification**: Uses ML to detect emotions (Happy, Angry, Sad, Hungry, Pain)
+- **Real-time Audio Processing**: Captures and analyzes animal sounds
+- **Emotion & Intent Classification**: Detects emotions (Happy, Angry, Sad, Hungry, Pain)
 - **Natural Language Translation**: Maps animal intents to human-readable text
-- **Lifelike Voice Response**: Speaks the translation using **Murf Falcon TTS**
+- **Lifelike Voice Response**: Speaks the translation using **SARVAM TTS** (primary) with Murf fallback
+- **LLM Translation**: Sarvam-105B generates natural, context-aware translations
 - **Modern UI**: Responsive React frontend with dynamic animal avatars
+
+### Supported Languages
+- 🇮🇳 **हिंदी (Hindi)** - Native Hindi TTS + LLM translation via SARVAM
+- 🇬🇧 **English** - English TTS + LLM translation via SARVAM
+- 🚀 **More coming soon**: Tamil, Bengali, Marathi, Gujarati, etc.
+
+### Voices (SARVAM Bulbul v3)
+A per-language voice picker runs live in the UI and is validated on the backend:
+
+| Language | Voices | Default |
+| -------- | ------ | ------- |
+| hi-IN    | `shubh`, `ritu`, `tanya` | `shubh` |
+| en-IN    | `neha`, `rohan` | `neha` |
+
+- The `voice` Form/query parameter flows through `/api/process-audio` and every `/api/demo/{id}` request and is echoed back in the response.
+- `validate_speaker()` in `backend/services/sarvam_integration.py` rejects voices that don't belong to the target language (e.g. `shubh` on `en-IN` falls back to `neha`).
+
+### ElevenLabs Sound-Effect Demo
+- 12 pre-generated dog/cat sound effects (6 emotions × 2 species) are served from `/elevenlabs/` and listed via `/api/demo/sounds` with Expected vs Predicted chips to expose the ML-classifier gap.
+
+### Demo Audio
+- The demo-mode samples in `backend/demo_audio/` are **real animal recordings** from
+  Wikimedia Commons (CC-licensed), normalized to 22050 Hz mono WAV with plain
+  (`{animal}_calm.wav`) and excited (`{animal}_intense.wav`) variants.
+- Provenance is tracked in `backend/demo_audio/SOURCES.json`.
+- Regenerate or refresh with:
+  `python scripts/download_real_audio.py` (set `REFRESH_ONLY=dog,cat` to re-fetch specific animals).
 
 ### Production Features
 - ✅ **Health Checks**: Automated monitoring for all services
@@ -33,10 +61,11 @@ ZooLingo is a **production-ready** voice-first AI agent that translates live ani
 ## 🛠️ Tech Stack
 
 ### Backend
-- **Framework**: Python 3.9, FastAPI
-- **Audio Processing**: Librosa, SoundFile
-- **ML/AI**: TensorFlow/Keras, Scikit-learn
-- **TTS**: Murf Falcon API
+- **Framework**: Python 3.11, FastAPI
+- **Audio Processing**: Audio feature extraction (librosa optional)
+- **ML/AI**: Heuristic + TF fallback classification
+- **TTS**: SARVAM Bulbul v3 (primary), Murf Falcon (fallback)
+- **LLM**: SARVAM Sarvam-105B (translation)
 - **ASR**: Deepgram SDK (optional)
 
 ### Frontend
@@ -55,7 +84,7 @@ ZooLingo is a **production-ready** voice-first AI agent that translates live ani
 
 ### Prerequisites
 - Docker & Docker Compose
-- API Keys for Murf (required) and Deepgram (optional)
+- API Keys for SARVAM (required) and Murf (optional)
 
 ### Installation
 
@@ -123,6 +152,16 @@ curl http://localhost:8000/health
 curl http://localhost:8000/api/config
 ```
 
+### Voice × Record Matrix
+Runs all 12 ElevenLabs demo records through every available voice (60 combinations)
+and verifies translation language, voice echo, and real MP3 TTS output:
+
+```bash
+cd backend
+python test_voice_matrix.py --delay 0.3 --report "demo/voice_matrix_report.md"
+```
+Expected result: `PASSED: 60/60  TTS verified: 60/60`.
+
 ## 📂 Project Structure
 
 ```
@@ -183,6 +222,27 @@ See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed instructions on:
 - Kubernetes
 - HTTPS setup with reverse proxy
 
+### Vercel (recommended for this hackathon)
+The repo ships a combined deployment: the FastAPI backend runs as a Python serverless
+function (`api/index.py`, slim `requirements.txt`) and the React build is served as
+static files, with `vercel.json` rewriting `/api`, `/static`, `/demo-audio`,
+`/elevenlabs`, and `/health` to the function.
+
+```bash
+# 1. Link/provision the project
+vercel link
+# 2. Set secrets (never commit these)
+vercel env add SARVAM_API_KEY
+vercel env add ELEVENLABS_API_KEY
+vercel env add ENVIRONMENT production
+vercel env add ALLOWED_ORIGINS https://your-project.vercel.app
+# 3. Deploy (Build Command runs `npm --prefix frontend run build`)
+vercel --prod
+```
+
+The backend detects `VERCEL=1` and writes scratch files to `/tmp` (read-only CWD) and
+returns TTS as a `data:audio/mpeg;base64,...` URI instead of a static file.
+
 ### Monitoring
 ```bash
 # View service status
@@ -197,7 +257,8 @@ docker stats
 
 ## 🏆 Hackathon Compliance
 
-- ✅ **Murf Falcon Integration**: Used for all voice outputs with retry logic
+- ✅ **SARVAM Bulbul v3 Integration**: Primary TTS for all voice outputs (Hindi + English), validated per-language voices, with Murf Falcon as fallback
+- ✅ **Sarvam-105B**: Multilingual LLM translation backend
 - ✅ **Innovation**: First-of-its-kind animal-to-human translator
 - ✅ **Code Quality**: Modular, documented, tested, and containerized
 - ✅ **Production Ready**: Health checks, monitoring, CI/CD, comprehensive docs

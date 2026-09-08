@@ -1,14 +1,28 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, History, Sparkles, Zap, Github, ExternalLink } from 'lucide-react';
+import { Mic, Volume2, History, Sparkles, Zap, Github, ExternalLink } from 'lucide-react';
 import AudioRecorder from './components/AudioRecorder';
 import AnimalAvatar from './components/AnimalAvatar';
 import HistoryPanel from './components/HistoryPanel';
 import DemoSoundSelector from './components/DemoSoundSelector';
+import LanguageSelector from './components/LanguageSelector';
+import ElevenLabsDemo from './components/ElevenLabsDemo';
+import VoiceSelector from './components/VoiceSelector';
 import { ToastProvider, useToast } from './components/Toast';
 
 // API base URL - adjust based on environment
 const API_BASE = import.meta.env.VITE_API_URL || '';
+
+// Intense emotions map to the "_intense" demo audio variant
+const INTENSE_EMOTIONS = new Set([
+    'Angry', 'Excited', 'Scared', 'Pain', 'Aggressive',
+    'Alert', 'Demanding', 'Bossy', 'Mischievous',
+]);
+
+const LANGUAGE_LABELS = {
+    'hi-IN': 'हिंदी (Hindi)',
+    'en-IN': 'English',
+};
 
 function AppContent() {
     const [result, setResult] = useState(null);
@@ -16,15 +30,37 @@ function AppContent() {
     const [history, setHistory] = useState([]);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('record'); // 'record' or 'demo'
+    const [language, setLanguage] = useState('hi-IN');
+    const [expectedSound, setExpectedSound] = useState(null);
+    const [voice, setVoice] = useState('shubh');
+    const [availableVoices, setAvailableVoices] = useState({});
     const audioRef = useRef(null);
     const toast = useToast();
+
+    // Load available voices per language + keep voice valid when language changes
+    useEffect(() => {
+        fetch(`${API_BASE}/api/languages`)
+            .then(res => res.json())
+            .then(data => {
+                if (!data.languages) return;
+                const map = {};
+                data.languages.forEach(l => { map[l.code] = l.voices || []; });
+                setAvailableVoices(map);
+                const targetVoices = map[language] || [];
+                setVoice(prev => (targetVoices.includes(prev) ? prev : (targetVoices[0] || prev)));
+            })
+            .catch(() => {});
+    }, [language]);
 
     const handleRecordingComplete = async (file) => {
         setIsProcessing(true);
         setResult(null);
+        setExpectedSound(null);
 
         const formData = new FormData();
         formData.append("file", file);
+        formData.append("language", language);
+        formData.append("voice", voice);
 
         try {
             const response = await fetch(`${API_BASE}/api/process-audio`, {
@@ -61,85 +97,111 @@ function AppContent() {
         }
     };
 
+    const playSound = useCallback((url) => {
+        if (!url) return;
+        const audio = new Audio(url.startsWith('http') ? url : `${API_BASE}${url}`);
+        audio.play().catch(e => console.log("Sound play prevented:", e));
+    }, []);
+
+    // Play the canned animal vocalization immediately when a demo is selected
+    const playDemoSample = useCallback((animal, emotion) => {
+        const variant = INTENSE_EMOTIONS.has(emotion) ? 'intense' : 'calm';
+        playSound(`/demo-audio/${animal.toLowerCase()}_${variant}.wav`);
+    }, [playSound]);
+
     const handleDemoSelect = async (demo) => {
         setIsProcessing(true);
         setResult(null);
+        setExpectedSound(null);
 
-        // Simulate API call for demo
+        // Play the animal's sample sound right away
+        playDemoSample(demo.animal, demo.emotion);
+
         try {
-            // For demo purposes, we'll make a mock request
-            // In production, you'd have actual demo audio files
-            const response = await fetch(`${API_BASE}/api/demo/${demo.id}`, {
+            const response = await fetch(`${API_BASE}/api/demo/${demo.id}?language=${encodeURIComponent(language)}&voice=${encodeURIComponent(voice)}`, {
                 method: 'POST',
-            }).catch(() => null);
+            });
 
-            // If no backend or demo endpoint, simulate result
-            if (!response || !response.ok) {
-                await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate processing
+            if (!response.ok) {
+                throw new Error(`Request failed: ${response.status}`);
+            }
 
-                const mockTranslations = {
-                    'Dog': {
-                        'Happy': ["I love you so much!", "Let's play!", "This is the best day ever!"],
-                        'Angry': ["Back off, I'm warning you!", "Grrr, leave me alone!"],
-                        'Sad': ["I miss you...", "Please don't leave."],
-                        'Hungry': ["Feed me now!", "Is that bacon I smell?"],
-                        'Pain': ["Ouch, that hurts!", "Help me please..."]
-                    },
-                    'Cat': {
-                        'Happy': ["Purr... you may pet me now.", "I tolerate your presence."],
-                        'Angry': ["Hiss! Don't touch me!", "I will destroy you!"],
-                        'Sad': ["My bowl is empty again.", "Why is the door closed?"],
-                        'Hungry': ["Feed me now, peasant!", "I can see the bottom of my bowl!"],
-                        'Pain': ["Hiss... stay away.", "Something is wrong..."]
-                    },
-                    'Cow': {
-                        'Happy': ["Moo! Life is good in the pasture.", "Such fresh grass today!"],
-                        'Angry': ["Stay away from my herd!", "Moo! I'm getting irritated!"],
-                        'Sad': ["The barn feels empty today.", "I miss the sunshine."],
-                        'Hungry': ["More hay, please!", "Moo! When is feeding time?"],
-                        'Pain': ["Something hurts, farmer.", "Moo... I need help."]
-                    },
-                    'Lion': {
-                        'Happy': ["ROAR! I am the king!", "The pride is strong today."],
-                        'Angry': ["ROAR! Leave my territory!", "You dare challenge me?!"],
-                        'Sad': ["The savanna feels lonely.", "I miss the old days."],
-                        'Hungry': ["Time for the hunt!", "I hunger for the chase!"],
-                        'Pain': ["Even kings feel pain.", "I need rest..."]
-                    }
-                };
-
-                const translations = mockTranslations[demo.animal]?.[demo.emotion] || ["I am an animal."];
-                const translation = translations[Math.floor(Math.random() * translations.length)];
-
-                const mockResult = {
-                    animal: demo.animal,
-                    emotion: demo.emotion,
-                    confidence: 0.85 + Math.random() * 0.14,
-                    translation: translation,
-                    audio_url: null, // No audio in demo mode
+            const data = await response.json();
+            if (data.status === "success") {
+                const newResult = {
+                    ...data.data,
                     id: Date.now(),
                     timestamp: new Date().toISOString()
                 };
+                setResult(newResult);
+                setHistory(prev => [newResult, ...prev].slice(0, 20));
+                toast.success("Translation Complete", `Your ${data.data.animal} is feeling ${data.data.emotion.toLowerCase()}!`);
 
-                setResult(mockResult);
-                setHistory(prev => [mockResult, ...prev].slice(0, 20));
-                toast.success("Demo Translation", `Simulated ${demo.animal} translation!`);
-            } else {
-                const data = await response.json();
-                if (data.status === "success") {
-                    const newResult = {
-                        ...data.data,
-                        id: Date.now(),
-                        timestamp: new Date().toISOString()
-                    };
-                    setResult(newResult);
-                    setHistory(prev => [newResult, ...prev].slice(0, 20));
-                    toast.success("Translation Complete", `Your ${data.data.animal} is feeling ${data.data.emotion.toLowerCase()}!`);
+                // Auto-play the translated voice (fixes silent demo audio)
+                if (data.data.audio_url) {
+                    const audio = new Audio(`${API_BASE}${data.data.audio_url}`);
+                    audioRef.current = audio;
+                    audio.play().catch(e => console.log("Auto-play prevented:", e));
                 }
+            } else {
+                throw new Error(data.message || "Demo processing failed");
             }
         } catch (error) {
             console.error("Demo Error:", error);
-            toast.error("Demo Failed", "Could not load demo audio");
+            toast.error("Demo Failed", "Could not load demo audio. Is the backend running?");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    // ElevenLabs demo mode: play the pre-recorded sound, then classify it live
+    const handleElevenLabsPlay = async (sound) => {
+        setIsProcessing(true);
+        setResult(null);
+        setExpectedSound(sound);
+
+        try {
+            const res = await fetch(`${API_BASE}${sound.url}`);
+            if (!res.ok) throw new Error(`Sound fetch failed: ${res.status}`);
+            const blob = await res.blob();
+
+            // Play it audibly for the audience (real server URL so the E2E can assert it)
+            const preview = new Audio(`${API_BASE}${sound.url}`);
+            await preview.play().catch(e => console.log("Preview play prevented:", e));
+
+            // Route the same audio through the real classification + translation pipeline
+            const formData = new FormData();
+            formData.append("file", new File([blob], sound.filename, { type: "audio/wav" }));
+            formData.append("language", language);
+            formData.append("voice", voice);
+
+            const response = await fetch(`${API_BASE}/api/process-audio`, {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await response.json();
+
+            if (data.status === "success") {
+                const newResult = {
+                    ...data.data,
+                    id: Date.now(),
+                    timestamp: new Date().toISOString()
+                };
+                setResult(newResult);
+                setHistory(prev => [newResult, ...prev].slice(0, 20));
+                toast.success("Translation Complete", `Your ${data.data.animal} is feeling ${data.data.emotion.toLowerCase()}!`);
+
+                if (data.data.audio_url) {
+                    const audio = new Audio(`${API_BASE}${data.data.audio_url}`);
+                    audioRef.current = audio;
+                    audio.play().catch(e => console.log("Auto-play prevented:", e));
+                }
+            } else {
+                toast.error("Processing Failed", data.message || "Could not process the demo sound");
+            }
+        } catch (error) {
+            console.error("ElevenLabs Demo Error:", error);
+            toast.error("Demo Failed", "Could not play the ElevenLabs demo sound. Is the backend running?");
         } finally {
             setIsProcessing(false);
         }
@@ -176,7 +238,7 @@ function AppContent() {
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel mb-4"
                 >
                     <Sparkles className="w-4 h-4 text-primary" />
-                    <span className="text-sm text-text-secondary">Powered by Murf Falcon TTS</span>
+                    <span className="text-sm text-text-secondary">Powered by SARVAM AI</span>
                 </motion.div>
 
                 <motion.h1
@@ -197,6 +259,21 @@ function AppContent() {
                 >
                     Voice-first AI agent that translates animal sounds into human language
                 </motion.p>
+
+                {/* Language Selector */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.25 }}
+                    className="mt-4 flex flex-col items-center justify-center gap-3"
+                >
+                    <LanguageSelector value={language} onChange={setLanguage} />
+                    <VoiceSelector
+                        value={voice}
+                        onChange={setVoice}
+                        voices={availableVoices[language] || []}
+                    />
+                </motion.div>
 
                 {/* History Button */}
                 <motion.button
@@ -288,17 +365,54 @@ function AppContent() {
                                             <Zap className="w-4 h-4" />
                                             {Math.round(result.confidence * 100)}% confidence
                                         </span>
+                                        {result.language && (
+                                            <span className="text-xs text-text-muted uppercase tracking-wide">
+                                                {LANGUAGE_LABELS[result.language] || result.language}
+                                            </span>
+                                        )}
+                                        {result.voice && (
+                                            <span className="text-xs text-text-secondary flex items-center gap-1">
+                                                <Mic className="w-3 h-3" />
+                                                Voice: {result.voice}
+                                            </span>
+                                        )}
                                         {result.audio_url && (
                                             <button
                                                 onClick={() => playAudio(result.audio_url)}
                                                 className="flex items-center gap-1 text-text-secondary hover:text-primary transition-colors"
                                             >
                                                 <Volume2 className="w-4 h-4" />
-                                                Replay
+                                                Replay Voice
+                                            </button>
+                                        )}
+                                        {result.demo_audio_url && (
+                                            <button
+                                                onClick={() => playSound(result.demo_audio_url)}
+                                                className="flex items-center gap-1 text-text-secondary hover:text-primary transition-colors"
+                                            >
+                                                <Volume2 className="w-4 h-4" />
+                                                Play Sample
                                             </button>
                                         )}
                                     </div>
                                 </motion.div>
+
+                                {/* Expected vs Predicted (ElevenLabs demo) */}
+                                {expectedSound && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="flex flex-wrap items-center justify-center gap-2 text-xs"
+                                    >
+                                        <span className="px-2.5 py-1 rounded-full bg-white/5 border border-glass-border text-text-secondary">
+                                            Expected: <b className="text-text-primary">{expectedSound.label}</b>
+                                        </span>
+                                        <span className="text-text-muted">→</span>
+                                        <span className="px-2.5 py-1 rounded-full bg-white/5 border border-glass-border text-text-secondary">
+                                            Predicted: <b className="text-text-primary">{result.emotion}</b>
+                                        </span>
+                                    </motion.div>
+                                )}
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -351,6 +465,10 @@ function AppContent() {
                                 >
                                     <DemoSoundSelector
                                         onSelectDemo={handleDemoSelect}
+                                        isProcessing={isProcessing}
+                                    />
+                                    <ElevenLabsDemo
+                                        onPlaySound={handleElevenLabsPlay}
                                         isProcessing={isProcessing}
                                     />
                                 </motion.div>

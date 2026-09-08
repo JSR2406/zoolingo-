@@ -1,6 +1,7 @@
 import os
 import logging
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+import base64
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,15 +11,85 @@ from datetime import datetime
 from typing import Optional
 import random
 
-from config import config
+from config import config, SERVERLESS
 from services.audio_processor import load_and_preprocess_audio
 from services.ai_classifier import classifier, ANIMALS, EMOTIONS
 from services.nlp_translator import translator
 from services.murf_integration import murf_client
-from services.sarvam_integration import SarvamTTSClient
+from services.sarvam_integration import SarvamTTSClient, VOICES_BY_LANGUAGE, DEFAULT_VOICES, validate_speaker
+from services.sarvam_llm import llm_translator
+from services.elevenlabs_demo import all_sounds
+from services.elevenlabs_sfx import sfx_client
 
 # Initialize SARVAM TTS client (primary)
 sarvam_client = SarvamTTSClient()
+
+# Intense emotions map to the "_intense" demo audio variant
+INTENSE_EMOTIONS = {
+    "Angry", "Excited", "Scared", "Pain", "Aggressive",
+    "Alert", "Demanding", "Bossy", "Mischievous",
+}
+
+DEFAULT_LANGUAGE = config.SARVAM_LANGUAGE
+
+# Normalize short language codes (e.g. "hi" -> "hi-IN") for SARVAM TTS
+LANG_BY_ALPHA2 = {
+    v.split("-")[0]: v for v in SarvamTTSClient.LANGUAGE_CODES.values()
+}
+
+def normalize_language(language: Optional[str]) -> str:
+    if not language:
+        return DEFAULT_LANGUAGE
+    lang = language.strip()
+    if "-" not in lang and lang.lower() in LANG_BY_ALPHA2:
+        return LANG_BY_ALPHA2[lang.lower()]
+    return lang
+
+def demo_audio_variant(emotion: str) -> str:
+    return "intense" if emotion in INTENSE_EMOTIONS else "calm"
+
+def demo_audio_url_for(animal: str, emotion: str) -> Optional[str]:
+    """Path to the canned animal sound for a given animal+emotion."""
+    animal_key = animal.lower()
+    variant = demo_audio_variant(emotion)
+    if os.path.exists(os.path.join(config.DEMO_AUDIO_DIR, f"{animal_key}_{variant}.wav")):
+        return f"/demo-audio/{animal_key}_{variant}.wav"
+    return None
+
+def finalize_translation(english_text: str, animal: str, emotion: str, language: Optional[str] = None) -> str:
+    """Apply LLM multilingual translation when enabled; otherwise keep English."""
+    lang = normalize_language(language)
+    if config.USE_SARVAM_LLM and llm_translator.api_key and lang.lower() != "en-in" and lang.lower() != "en":
+        translated = llm_translator.translate(english_text, animal, emotion, target_language=lang)
+        if translated and translated.strip('\n') != '':
+            return translated
+    return english_text
+
+def generate_tts_audio(text: str, speaker: Optional[str] = None, language: Optional[str] = None) -> Optional[bytes]:
+    """Generate TTS audio using SARVAM (primary) or Murf (fallback)."""
+    # SARVAM is primary TTS
+    if getattr(config, 'USE_SARVAM', True) and sarvam_client.api_key:
+        logger.info("Generating TTS with SARVAM (primary)...")
+        lang = normalize_language(language)
+        resolved_speaker = validate_speaker(speaker or config.SARVAM_VOICE_ID, lang)
+        result = sarvam_client.generate_speech(
+            text=text,
+            language_code=lang,
+            speaker=resolved_speaker,
+            save_path=os.path.join(config.UPLOAD_DIR, "temp_sarvam.mp3")
+        )
+        if result['success'] and result.get('audio_data'):
+            return result['audio_data']
+        else:
+            logger.warning(f"SARVAM TTS failed: {result.get('error')}")
+    
+    # Fallback to Murf
+    if config.MURF_API_KEY:
+        logger.info("Generating TTS with Murf (fallback)...")
+        audio_content = murf_client.generate_speech(text)
+        return audio_content
+    
+    return None
 
 # Setup logging
 config.setup_logging()
@@ -103,7 +174,9 @@ async def health_check():
         "services": {
             "api": "operational",
             "sarvam_integration": "operational" if config.SARVAM_API_KEY else "degraded",
+            "sarvam_llm_translation": "operational" if (config.SARVAM_API_KEY and config.USE_SARVAM_LLM) else "degraded",
             "murf_integration": "operational" if config.MURF_API_KEY else "degraded",
+            "elevenlabs_sfx": "operational" if config.ELEVENLABS_API_KEY else "degraded",
             "classifier": "operational"
         }
     }
@@ -125,9 +198,32 @@ async def get_config():
         "allowed_extensions": list(config.ALLOWED_EXTENSIONS),
         "sarvam_configured": bool(config.SARVAM_API_KEY),
         "sarvam_language": config.SARVAM_LANGUAGE,
+        "sarvam_llm_translation": bool(config.USE_SARVAM_LLM),
         "murf_configured": bool(config.MURF_API_KEY),
+        "elevenlabs_configured": bool(config.ELEVENLABS_API_KEY),
+        "voices": VOICES_BY_LANGUAGE,
+        "default_voice": config.SARVAM_VOICE_ID,
         "supported_animals": translator.get_supported_animals(),
-        "supported_emotions": translator.get_supported_emotions()
+        "supported_emotions": translator.get_supported_emotions(),
+        "supported_languages": config.SUPPORTED_LANGUAGES if hasattr(config, "SUPPORTED_LANGUAGES") else None
+    }
+
+@app.get("/api/languages")
+async def get_languages():
+    """List languages available for translation + TTS (English + Hindi MVP)."""
+    languages = []
+    for lang in config.SUPPORTED_LANGUAGES:
+        code = lang if isinstance(lang, str) else lang.get("code")
+        languages.append({
+            "code": code,
+            "name": lang if isinstance(lang, str) else lang.get("name", code),
+            "voices": VOICES_BY_LANGUAGE.get(code, []),
+            "default_voice": DEFAULT_VOICES.get(code, config.SARVAM_VOICE_ID),
+        })
+    return {
+        "default": DEFAULT_LANGUAGE,
+        "llm_enabled": config.USE_SARVAM_LLM and bool(config.SARVAM_API_KEY),
+        "languages": languages,
     }
 
 def validate_file_extension(filename: str) -> bool:
@@ -135,32 +231,12 @@ def validate_file_extension(filename: str) -> bool:
     ext = filename.split(".")[-1].lower()
     return ext in config.ALLOWED_EXTENSIONS
 
-def generate_tts_audio(text: str) -> Optional[bytes]:
-    """Generate TTS audio using SARVAM (primary) or Murf (fallback)"""
-    # SARVAM is primary TTS
-    if getattr(config, 'USE_SARVAM', True) and sarvam_client.api_key:
-        logger.info("Generating TTS with SARVAM (primary)...")
-        result = sarvam_client.generate_speech(
-            text=text,
-            language_code="hi-IN",
-            speaker="shubh",
-            save_path=os.path.join(config.UPLOAD_DIR, "temp_sarvam.mp3")
-        )
-        if result['success'] and result.get('audio_data'):
-            return result['audio_data']
-        else:
-            logger.warning(f"SARVAM TTS failed: {result.get('error')}")
-    
-    # Fallback to Murf
-    if config.MURF_API_KEY:
-        logger.info("Generating TTS with Murf (fallback)...")
-        audio_content = murf_client.generate_speech(text)
-        return audio_content
-    
-    return None
-
 @app.post("/api/process-audio")
-async def process_audio(file: UploadFile = File(...)):
+async def process_audio(
+    file: UploadFile = File(...),
+    language: Optional[str] = Form(None),
+    voice: Optional[str] = Form(None),
+):
     """
     Process uploaded animal audio and return translation with TTS
     """
@@ -215,21 +291,30 @@ async def process_audio(file: UploadFile = File(...)):
         
         # 3. Translate to Human Language
         logger.info("Generating translation...")
-        translation_text = translator.translate(animal, emotion)
-        
+        base_translation = translator.translate(animal, emotion)
+        target_language = language or DEFAULT_LANGUAGE
+        translation_text = finalize_translation(base_translation, animal, emotion, target_language)
+
+        # Resolve the TTS voice (validated against the target language)
+        resolved_voice = validate_speaker(voice or config.SARVAM_VOICE_ID, target_language)
+
         # 4. Generate Speech (SARVAM primary, Murf fallback)
         audio_url = None
         if sarvam_client.api_key or config.MURF_API_KEY:
             logger.info("Generating TTS audio...")
-            audio_content = generate_tts_audio(translation_text)
+            audio_content = generate_tts_audio(translation_text, speaker=resolved_voice, language=target_language)
             
             if audio_content:
-                output_audio_filename = f"response_{filename}.mp3"
-                output_audio_path = os.path.join(config.UPLOAD_DIR, output_audio_filename)
-                
-                with open(output_audio_path, "wb") as f:
-                    f.write(audio_content)
-                audio_url = f"/static/{output_audio_filename}"
+                if SERVERLESS:
+                    # Read-only filesystem: hand the MP3 back as a data URI instead of a static file
+                    audio_url = "data:audio/mpeg;base64," + base64.b64encode(audio_content).decode('ascii')
+                else:
+                    output_audio_filename = f"response_{filename}.mp3"
+                    output_audio_path = os.path.join(config.UPLOAD_DIR, output_audio_filename)
+
+                    with open(output_audio_path, "wb") as f:
+                        f.write(audio_content)
+                    audio_url = f"/static/{output_audio_filename}"
                 logger.info(f"TTS audio generated: {audio_url}")
             else:
                 logger.warning("TTS generation failed")
@@ -248,7 +333,9 @@ async def process_audio(file: UploadFile = File(...)):
                 "emotion": emotion,
                 "confidence": confidence,
                 "translation": translation_text,
-                "audio_url": audio_url
+                "audio_url": audio_url,
+                "language": target_language,
+                "voice": resolved_voice
             }
         })
         
@@ -270,7 +357,11 @@ async def process_audio(file: UploadFile = File(...)):
 
 # Demo endpoint for testing without actual audio
 @app.post("/api/demo/{demo_id}")
-async def process_demo(demo_id: str):
+async def process_demo(
+    demo_id: str,
+    language: Optional[str] = Query(None),
+    voice: Optional[str] = Query(None),
+):
     """
     Process a demo sound without actual audio file.
     Useful for demonstrations and testing.
@@ -313,22 +404,36 @@ async def process_demo(demo_id: str):
             emotion = emotion_key.capitalize()
         
         # Generate translation
-        translation_text = translator.translate(animal, emotion)
+        base_translation = translator.translate(animal, emotion)
         confidence = round(random.uniform(0.85, 0.98), 2)
-        
+
+        # LLM multilingual translation
+        target_language = language or DEFAULT_LANGUAGE
+        translation_text = finalize_translation(base_translation, animal, emotion, target_language)
+
+        # Demo audio sample (canned animal sound for the exported demo)
+        demo_audio_url = demo_audio_url_for(animal, emotion)
+
+        # Resolve the TTS voice (validated against the target language)
+        resolved_voice = validate_speaker(voice or config.SARVAM_VOICE_ID, target_language)
+
         # Generate TTS if configured (SARVAM primary, Murf fallback)
         audio_url = None
         if sarvam_client.api_key or config.MURF_API_KEY:
             logger.info("Generating TTS audio...")
-            audio_content = generate_tts_audio(translation_text)
+            audio_content = generate_tts_audio(translation_text, speaker=resolved_voice, language=target_language)
             
             if audio_content:
-                output_filename = f"demo_{demo_id}_{uuid.uuid4().hex[:8]}.mp3"
-                output_path = os.path.join(config.UPLOAD_DIR, output_filename)
-                
-                with open(output_path, "wb") as f:
-                    f.write(audio_content)
-                audio_url = f"/static/{output_filename}"
+                if SERVERLESS:
+                    # Read-only filesystem: hand the MP3 back as a data URI instead of a static file
+                    audio_url = "data:audio/mpeg;base64," + base64.b64encode(audio_content).decode('ascii')
+                else:
+                    output_filename = f"demo_{demo_id}_{uuid.uuid4().hex[:8]}.mp3"
+                    output_path = os.path.join(config.UPLOAD_DIR, output_filename)
+
+                    with open(output_path, "wb") as f:
+                        f.write(audio_content)
+                    audio_url = f"/static/{output_filename}"
                 logger.info(f"Demo TTS generated: {audio_url}")
         
         return JSONResponse(content={
@@ -340,7 +445,10 @@ async def process_demo(demo_id: str):
                 "confidence": confidence,
                 "translation": translation_text,
                 "audio_url": audio_url,
-                "demo_mode": True
+                "demo_audio_url": demo_audio_url,
+                "demo_mode": True,
+                "language": target_language,
+                "voice": resolved_voice
             }
         })
         
@@ -362,8 +470,45 @@ async def get_supported():
         "emotions": translator.get_supported_emotions()
     }
 
+# ElevenLabs dog/cat pre-recorded demo sounds (12 sounds)
+@app.get("/api/demo/sounds")
+async def list_elevenlabs_sounds():
+    """
+    List the pre-generated ElevenLabs demo sounds (dog + cat x 6 emotions).
+    Each entry includes its URL, prompt, and expected translations.
+    """
+    sounds = []
+    for s in all_sounds():
+        if not os.path.exists(os.path.join(config.ELEVENLABS_DEMO_DIR, s["filename"])):
+            continue
+        sounds.append({
+            "filename": s["filename"],
+            "species": s["species"],
+            "animal": s["animal"],
+            "emotion": s["emotion"],
+            "label": s["label"],
+            "classifier_label": s["classifier_label"],
+            "url": f"/elevenlabs/{s['filename']}",
+            "expected_en": s["expected_en"],
+            "expected_hi": s["expected_hi"],
+        })
+    return {
+        "status": "success",
+        "configured": bool(config.ELEVENLABS_API_KEY),
+        "total": len(sounds),
+        "sounds": sounds,
+    }
+
 # Serve static files for audio playback
 app.mount("/static", StaticFiles(directory=config.UPLOAD_DIR), name="static")
+
+# Serve demo audio files (pre-generated animal sounds for the demo flow)
+os.makedirs(config.DEMO_AUDIO_DIR, exist_ok=True)
+app.mount("/demo-audio", StaticFiles(directory=config.DEMO_AUDIO_DIR), name="demo-audio")
+
+# Serve ElevenLabs pre-generated dog/cat demo sounds
+os.makedirs(config.ELEVENLABS_DEMO_DIR, exist_ok=True)
+app.mount("/elevenlabs", StaticFiles(directory=config.ELEVENLABS_DEMO_DIR), name="elevenlabs")
 
 if __name__ == "__main__":
     import uvicorn

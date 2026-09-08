@@ -1,0 +1,77 @@
+{
+  "dog": {
+    "title": "File:Barking of a dog 2.ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Barking_of_a_dog_2.ogg",
+    "license": "CC BY-SA 4.0 (Wikimedia Commons)"
+  },
+  "cat": {
+    "title": "File:Meow.ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Meow.ogg",
+    "license": "CC BY-SA (Wikimedia Commons)"
+  },
+  "cow": {
+    "title": "File:Single Cow Moo.ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Single_Cow_Moo.ogg",
+    "license": "CC BY-SA (Wikimedia Commons)"
+  },
+  "lion": {
+    "title": "File:Lionroar.wav",
+    "url": "https://commons.wikimedia.org/wiki/File:Lionroar.wav",
+    "license": "Public domain (Wikimedia Commons)"
+  },
+  "bird": {
+    "title": "File:Juvenile white-backed Australian magpie (Gymnorhina tibicen tyrannica) song.ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Juvenile_white-backed_Australian_magpie_(Gymnorhina_tibicen_tyrannica)_song.ogg",
+    "license": "CC BY-SA (Wikimedia Commons)"
+  },
+  "horse": {
+    "title": "File:Wiehern.ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Wiehern.ogg",
+    "license": "CC BY-SA (Wikimedia Commons)"
+  },
+  "elephant": {
+    "title": "File:Elephant voice - trumpeting.ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Elephant_voice_-_trumpeting.ogg",
+    "license": "CC BY-SA (Wikimedia Commons)"
+  },
+  "sheep": {
+    "title": "File:Sheep bleating.ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Sheep_bleating.ogg",
+    "license": "CC BY-SA (Wikimedia Commons)"
+  },
+  "goat": {
+    "title": "File:Herd of goats bleating.ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Herd_of_goats_bleating.ogg",
+    "license": "CC BY-SA (Wikimedia Commons)"
+  },
+  "pig": {
+    "title": "File:Pig grunt - Erdie.ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Pig_grunt_-_Erdie.ogg",
+    "license": "CC BY-SA (Wikimedia Commons)"
+  },
+  "chicken": {
+    "title": "File:Hen announcing shes lain an egg.ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Hen_announcing_shes_lain_an_egg.ogg",
+    "license": "CC BY-SA (Wikimedia Commons)"
+  },
+  "duck": {
+    "title": "File:Anas platyrhynchos - Mallard - XC112828.ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Anas_platyrhynchos_-_Mallard_-_XC112828.ogg",
+    "license": "CC BY-SA (Xeno-canto via Wikimedia Commons)"
+  },
+  "monkey": {
+    "title": "File:Mantled Howler Monkey (Alouatta palliata) (W ALOUATTA PALLIATA R1 C2).ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Mantled_Howler_Monkey_(Alouatta_palliata)_(W_ALOUATTA_PALLIATA_R1_C2).ogg",
+    "license": "CC BY-SA (Wikimedia Commons)"
+  },
+  "parrot": {
+    "title": "File:African grey parrot sound.wav",
+    "url": "https://commons.wikimedia.org/wiki/File:African_grey_parrot_sound.wav",
+    "license": "CC BY-SA (Wikimedia Commons)"
+  },
+  "wolf": {
+    "title": "File:Wolf howls.ogg",
+    "url": "https://commons.wikimedia.org/wiki/File:Wolf_howls.ogg",
+    "license": "CC BY-SA (Wikimedia Commons)"
+  }
+}
