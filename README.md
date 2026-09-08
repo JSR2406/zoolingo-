@@ -240,6 +240,8 @@ vercel env add ALLOWED_ORIGINS https://your-project.vercel.app
 vercel --prod
 ```
 
+**Live deployment:** https://zoolingo-deploy.vercel.app
+
 The backend detects `VERCEL=1` and writes scratch files to `/tmp` (read-only CWD) and
 returns TTS as a `data:audio/mpeg;base64,...` URI instead of a static file.
 
