@@ -1,0 +1,12 @@
+{
+  "name": "zoolingo",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "install:frontend": "npm --prefix frontend install --no-fund --no-audit",
+    "build:frontend": "npm --prefix frontend run build",
+    "build": "npm run install:frontend && npm run build:frontend",
+    "dev:frontend": "npm --prefix frontend run dev -- --port 3000",
+    "dev:backend": "python backend/app.py"
+  }
+}
