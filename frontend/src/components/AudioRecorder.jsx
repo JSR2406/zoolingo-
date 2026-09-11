@@ -1,4 +1,59 @@
 import React, { useState, useRef, useCallback } from 'react';
+
+// Convert an AudioBuffer to a 16-bit PCM WAV Blob
+const audioBufferToWav = (buffer) => {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const numFrames = buffer.length;
+    const bytesPerSample = 2;
+    const blockAlign = numChannels * bytesPerSample;
+    const dataSize = numFrames * blockAlign;
+
+    const arrayBuffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(arrayBuffer);
+
+    const writeString = (offset, str) => {
+        for (let i = 0; i < str.length; i++) {
+            view.setUint8(offset + i, str.charCodeAt(i));
+        }
+    };
+
+    // RIFF header
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, 'WAVE');
+    // fmt chunk
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true);
+    // data chunk
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
+
+    // Interleave channels, clip to 16-bit signed, mixed to mono
+    const channelData = [];
+    for (let c = 0; c < numChannels; c++) {
+        channelData.push(buffer.getChannelData(c));
+    }
+    let offset = 44;
+    for (let i = 0; i < numFrames; i++) {
+        let sample = 0;
+        for (let c = 0; c < numChannels; c++) {
+            sample += channelData[c][i];
+        }
+        sample = sample / numChannels;
+        sample = Math.max(-1, Math.min(1, sample));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        offset += 2;
+    }
+
+    return new Blob([view], { type: 'audio/wav' });
+};
 import { Mic, Square, Loader2, Upload, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -10,6 +65,22 @@ const AudioRecorder = ({ onRecordingComplete, isProcessing }) => {
     const chunksRef = useRef([]);
     const timerRef = useRef(null);
     const fileInputRef = useRef(null);
+
+    // Decode the WebM/Opus recording and re-encode as WAV so the backend can
+    // process it (backend decodes WAV directly without ffmpeg).
+    const webmToWav = async (blob) => {
+        try {
+            const arrayBuffer = await blob.arrayBuffer();
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            const audioCtx = new AudioCtx();
+            const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+            const wavBlob = audioBufferToWav(decoded);
+            return new File([wavBlob], "recording.wav", { type: 'audio/wav' });
+        } catch (err) {
+            console.error("WebM->WAV conversion failed:", err);
+            return new File([blob], "recording.webm", { type: 'audio/webm' });
+        }
+    };
 
     const startRecording = async () => {
         try {
@@ -30,10 +101,10 @@ const AudioRecorder = ({ onRecordingComplete, isProcessing }) => {
                 }
             };
 
-            mediaRecorderRef.current.onstop = () => {
+            mediaRecorderRef.current.onstop = async () => {
                 const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-                const file = new File([blob], "recording.webm", { type: 'audio/webm' });
-                onRecordingComplete(file);
+                const wavFile = await webmToWav(blob);
+                onRecordingComplete(wavFile);
             };
 
             mediaRecorderRef.current.start(100); // Collect data every 100ms

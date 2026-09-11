@@ -55,7 +55,7 @@ class Config:
     # File Upload
     UPLOAD_DIR = os.getenv("UPLOAD_DIR", "temp_uploads" if not SERVERLESS else _SCRATCH)
     MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
-    ALLOWED_EXTENSIONS = {"wav", "mp3", "ogg", "flac", "m4a"}
+    ALLOWED_EXTENSIONS = {"wav", "mp3", "ogg", "flac", "m4a", "webm"}
     
     # Model Configuration
     MODEL_PATH = os.getenv("MODEL_PATH", "models/emotion_classifier.h5")

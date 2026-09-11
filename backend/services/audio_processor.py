@@ -13,6 +13,39 @@ except ImportError:
     LIBROSA_AVAILABLE = False
     logger.warning("Librosa not available. Audio processing will use fallback mode.")
 
+def load_audio_to_numpy(file_path, sr=22050):
+    """
+    Load audio (including WebM/Opus from mic recordings) to a mono float32
+    numpy array resampled to `sr`. Returns (y, sr) or (None, sr) on failure.
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+    try:
+        if LIBROSA_AVAILABLE and ext not in (".webm", ".opus"):
+            y, actual_sr = librosa.load(file_path, sr=sr, mono=True)
+            return y, sr
+        # WebM/Opus (and any other unsupported container) via PyAV + numpy
+        import av
+        import numpy as np
+        container = av.open(file_path)
+        stream = container.streams.audio[0]
+        frames = []
+        resampler = av.AudioResampler(format="fltp", layout="mono", rate=sr)
+        for frame in container.decode(stream):
+            for out_frame in resampler.resample(frame):
+                arr = out_frame.to_ndarray()
+                if arr.ndim > 1:
+                    arr = arr[0]
+                frames.append(arr)
+        container.close()
+        if not frames:
+            logger.warning("No audio frames decoded from %s", file_path)
+            return None, sr
+        y = np.concatenate(frames)
+        return y.astype(np.float32), sr
+    except Exception as e:
+        logger.error(f"Error loading audio {file_path}: {e}")
+        return None, sr
+
 def load_and_preprocess_audio(file_path, duration=3, sr=22050):
     """
     Load audio file, denoise (simple), and extract MFCC features.
@@ -45,8 +78,13 @@ def _process_with_librosa(file_path, duration, sr):
     Process audio using librosa for proper MFCC extraction.
     """
     try:
-        # Load audio
-        y, sr = librosa.load(file_path, sr=sr, duration=duration)
+        # Load audio (handles webm/opus via PyAV fallback too)
+        if os.path.splitext(file_path)[1].lower() in (".webm", ".opus"):
+            y, _ = load_audio_to_numpy(file_path, sr=sr)
+            if y is None:
+                return _generate_mock_features(file_path)
+        else:
+            y, _ = librosa.load(file_path, sr=sr, duration=duration, mono=True)
         
         if len(y) == 0:
             logger.warning("Empty audio file")

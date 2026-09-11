@@ -14,6 +14,7 @@ import random
 from config import config, SERVERLESS
 from services.audio_processor import load_and_preprocess_audio
 from services.ai_classifier import classifier, ANIMALS, EMOTIONS
+from services.yamnet_classifier import yamnet_classifier
 from services.nlp_translator import translator
 from services.murf_integration import murf_client
 from services.sarvam_integration import SarvamTTSClient, VOICES_BY_LANGUAGE, DEFAULT_VOICES, validate_speaker
@@ -280,9 +281,23 @@ async def process_audio(
         if features is None:
             raise HTTPException(status_code=400, detail="Could not process audio file")
         
-        # 2. Classify Emotion/Intent
+        # 2. Classify Emotion/Intent (real YAMNet AudioSet model first, legacy fallback)
         logger.info("Classifying emotion and animal...")
-        classification = classifier.predict(features)
+        classification = None
+        try:
+            yamnet_result = yamnet_classifier.classify(file_path)
+            if yamnet_result:
+                classification = yamnet_result
+                logger.info(
+                    f"YAMNet detected [{', '.join(e['class'] for e in yamnet_result.get('evidence', [])[:3])}]"
+                )
+        except Exception as e:
+            logger.warning(f"YAMNet classification failed: {e}")
+        
+        if classification is None:
+            classification = classifier.predict(features)
+            classification.setdefault("classifier", "legacy")
+        
         animal = classification["animal"]
         emotion = classification["emotion"]
         confidence = classification["confidence"]
@@ -332,6 +347,7 @@ async def process_audio(
                 "animal": animal,
                 "emotion": emotion,
                 "confidence": confidence,
+                "classifier": classification.get("classifier", "unknown"),
                 "translation": translation_text,
                 "audio_url": audio_url,
                 "language": target_language,
