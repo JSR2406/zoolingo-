@@ -76,6 +76,51 @@ def test_l5_outcome():
     assert d["intervention_worked"] and d["did_pm25"] < 0
 
 
+def test_cpcb_aqi_breakpoints():
+    from bharataqi_2.realtime import india_aqi, india_category
+    assert india_aqi(pm25=20)["category"] == "Good"
+    assert india_aqi(pm25=45)["category"] == "Satisfactory"
+    assert india_aqi(pm25=75)["category"] == "Moderate"
+    assert india_aqi(pm25=100)["category"] == "Poor"
+    assert india_aqi(pm25=200)["category"] == "Very Poor"
+    assert india_aqi(pm25=300)["category"] == "Severe"
+    # Overall = max sub-index; pm10=300 alone forces Poor.
+    r = india_aqi(pm25=20, pm10=300)
+    assert r["aqi"] >= 201 and r["driving_pollutant"] == "pm10"
+    assert india_category(0) == "Good" and india_category(500) == "Severe"
+
+
+def test_precautions_cover_all_categories():
+    from bharataqi_2.realtime import india_category, precautions_for_aqi
+    for aqi in (10, 75, 150, 250, 350, 480):
+        p = precautions_for_aqi(aqi)
+        assert p["category"] == india_category(aqi)
+        assert {"health", "mask", "outdoor", "indoor", "sensitive_groups", "grap"} <= set(p["advisory"])
+        assert {"construction_dust", "waste_burning", "transport", "indoor"} <= set(p["prevention"])
+
+
+def test_tracker_ranking_and_alerts_offline():
+    from bharataqi_2 import realtime
+    from bharataqi_2.realtime import RegionTracker
+    t = RegionTracker(alert_threshold=200.0)
+    t.watch("CleanTown", 12.9, 77.6)
+    t.watch("SmogVille", 28.6, 77.2)
+    realtime.PROVIDERS["stub"] = lambda lat, lon: {
+        "india_aqi": {"aqi": 320.0 if lat > 20 else 60.0,
+                      "category": "Very Poor" if lat > 20 else "Satisfactory",
+                      "driving_pollutant": "pm25"}}
+    try:
+        out = t.refresh(provider="stub")
+        assert out["refreshed"] == 2 and not out["errors"]
+        rank = t.ranking()
+        assert rank[0]["region"] == "SmogVille"  # worst first
+        alerts = t.alerts()
+        assert len(alerts) == 1 and alerts[0]["region"] == "SmogVille"
+        assert "N95" in alerts[0]["message"] or "AQ" in alerts[0]["message"]
+    finally:
+        del realtime.PROVIDERS["stub"]
+
+
 if __name__ == "__main__":
     for name, fn in sorted({k: v for k, v in globals().items() if k.startswith("test_")}.items()):
         fn()

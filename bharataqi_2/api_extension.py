@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 from .calibration import CalibrationEngine, DriftWatchdog
 from .grap_engine import assess_forecast, scenario_delta_pm25
 from .outcome_tracker import difference_in_differences, episode_effect, monetise_benefit
+from .realtime import RegionTracker, fetch_open_meteo, india_aqi, precautions_for_aqi
 
 router = APIRouter(prefix="/v2", tags=["BharatAQI-X 2.0"])
 
@@ -36,6 +37,7 @@ _CALIBRATORS: dict[str, CalibrationEngine] = {}
 _READINGS: list[dict] = []
 _WATCHDOG = DriftWatchdog(contamination=0.05)
 _WATCHDOG_BASELINE: list[float] = []
+_TRACKER = RegionTracker(alert_threshold=200.0)
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────
@@ -79,6 +81,12 @@ class OutcomeRequest(BaseModel):
     control_after: list[float] | None = None
     population: int | None = None
     inr_per_ug_per_person: float | None = None
+
+
+class WatchRequest(BaseModel):
+    name: str = "Delhi"
+    latitude: float = 28.61
+    longitude: float = 77.21
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────
@@ -163,3 +171,60 @@ def mount_onto(app: FastAPI) -> FastAPI:
     if not any(r.path.startswith("/v2/") for r in app.routes):
         app.include_router(router)
     return app
+
+
+# ── Realtime air + multi-region tracker + advisory ─────────────────────────
+@router.get("/air/live")
+def air_live(latitude: float, longitude: float, city: str = ""):
+    """Keyless live snapshot (Open-Meteo) with CPCB India AQI + precautions."""
+    try:
+        snap = fetch_open_meteo(latitude, longitude)
+        aqi = snap["india_aqi"]["aqi"]
+        return {**snap, "city": city, "precautions": precautions_for_aqi(aqi)}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Live provider unreachable: {e}")
+
+
+@router.get("/air/forecast")
+def air_forecast(latitude: float, longitude: float, hours: int = 24):
+    try:
+        snap = fetch_open_meteo(latitude, longitude, forecast_hours=min(168, max(1, hours)))
+        return {"latitude": latitude, "longitude": longitude,
+                "forecast": snap["forecast_next_hours"]}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Live provider unreachable: {e}")
+
+
+@router.get("/advisory")
+def advisory(aqi: float):
+    if not 0 <= aqi <= 600:
+        raise HTTPException(status_code=400, detail="aqi must be in [0, 600]")
+    return precautions_for_aqi(aqi)
+
+
+@router.post("/tracker/watch")
+def tracker_watch(req: WatchRequest):
+    return _TRACKER.watch(req.name, req.latitude, req.longitude)
+
+
+@router.get("/tracker/list")
+def tracker_list():
+    return {"regions": _TRACKER.regions, "total": len(_TRACKER.regions)}
+
+
+@router.post("/tracker/refresh")
+def tracker_refresh(provider: str = "open_meteo"):
+    try:
+        return _TRACKER.refresh(provider)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/tracker/ranking")
+def tracker_ranking():
+    return {"ranking": _TRACKER.ranking(), "alerts": _TRACKER.alerts()}
+
+
+@router.delete("/tracker/watch/{name}")
+def tracker_unwatch(name: str):
+    return _TRACKER.unwatch(name)
