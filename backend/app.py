@@ -1,7 +1,7 @@
 import os
 import logging
 import base64
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form, Query, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -28,6 +28,16 @@ from services.elevenlabs_demo import all_sounds
 from services.elevenlabs_sfx import sfx_client
 from petcare.database import init_db
 from petcare.router import petcare_router
+from auth_router import router as auth_router
+from auth import (
+    get_current_user,
+    get_optional_user,
+    check_conversion_allowed,
+    reserve_conversion,
+    confirm_conversion,
+    release_conversion,
+    get_user_conversions_used,
+)
 
 # Initialize SARVAM TTS client (primary)
 sarvam_client = SarvamTTSClient()
@@ -172,6 +182,7 @@ os.makedirs(config.UPLOAD_DIR, exist_ok=True)
 # PetCare: create tables + seed (idempotent; :memory: fallback on read-only serverless FS)
 init_db()
 app.include_router(petcare_router)
+app.include_router(auth_router)
 
 
 # Request logging middleware
@@ -291,18 +302,32 @@ async def process_audio(
     file: UploadFile = File(...),
     language: Optional[str] = Form(None),
     voice: Optional[str] = Form(None),
+    current_user: dict = Depends(get_current_user),
 ):
     """
-    Process uploaded animal audio and return translation with TTS
+    Process uploaded animal audio and return translation with TTS.
+    Requires authentication. Consumes one conversion from the user's quota.
     """
+    user_id = str(current_user["id"])
     file_path: Optional[str] = None
     output_audio_path: Optional[str] = None
+    reservation_id: Optional[str] = None
 
     try:
-        logger.info(f"Processing audio file: {file.filename}")
+        logger.info(f"Processing audio file: {file.filename} for user {user_id}")
+
+        # Check and reserve a conversion from the user's quota
+        allowed, reason = check_conversion_allowed(current_user)
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=reason,
+            )
+        reservation_id = reserve_conversion(current_user)
 
         # Validate file extension
         if not validate_file_extension(file.filename):
+            release_conversion(current_user, reservation_id)
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid file type. Allowed: {', '.join(config.ALLOWED_EXTENSIONS)}",
@@ -373,6 +398,7 @@ async def process_audio(
 
         # 4. Generate Speech (SARVAM primary, Murf fallback)
         audio_url = None
+        tts_success = False
         if sarvam_client.api_key or config.MURF_API_KEY:
             logger.info("Generating TTS audio...")
             audio_content = generate_tts_audio(
@@ -395,6 +421,7 @@ async def process_audio(
                         f.write(audio_content)
                     audio_url = f"/static/{output_audio_filename}"
                 logger.info(f"TTS audio generated: {audio_url}")
+                tts_success = True
             else:
                 logger.warning("TTS generation failed")
         else:
@@ -403,6 +430,18 @@ async def process_audio(
         # Cleanup input file
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
+
+        # Consume a conversion only after a usable interpretation AND playable
+        # speech output are successfully produced.
+        if tts_success and audio_url:
+            confirm_conversion(current_user, reservation_id)
+        else:
+            # Release reservation on TTS failure - user shouldn't lose allowance
+            release_conversion(current_user, reservation_id)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Speech generation failed. Please try again.",
+            )
 
         return JSONResponse(
             content={
@@ -417,14 +456,22 @@ async def process_audio(
                     "audio_url": audio_url,
                     "language": target_language,
                     "voice": resolved_voice,
+                    "conversions_used": get_user_conversions_used(current_user),
                 },
             }
         )
 
     except HTTPException:
+        # Release reservation on client errors (400, 403, etc.)
+        if reservation_id is not None:
+            release_conversion(current_user, reservation_id)
         raise
     except Exception as e:
         logger.error(f"Error processing audio: {str(e)}", exc_info=True)
+
+        # Release reservation on server error
+        if reservation_id is not None:
+            release_conversion(current_user, reservation_id)
 
         # Cleanup on error
         if file_path and os.path.exists(file_path):
