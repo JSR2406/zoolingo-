@@ -17,6 +17,7 @@ import Health from './pages/Health';
 import CareSchedules from './pages/CareSchedules';
 import VetDirectory from './pages/VetDirectory';
 import Expert from './pages/Expert';
+import Pricing from './pages/Pricing';
 
 import { useToast } from './components/Toast';
 
@@ -580,6 +581,7 @@ function App() {
                     <Route path="/care-schedules" element={<CareSchedules />} />
                     <Route path="/vet-directory" element={<VetDirectory />} />
                     <Route path="/expert" element={<Expert />} />
+                    <Route path="/pricing" element={<Pricing />} />
                     <Route path="/translate" element={<AppContent />} />
                 </Route>
             </Routes>

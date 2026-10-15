@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, PawPrint, HeartPulse, CalendarDays, Stethoscope, MessagesSquare, Languages } from 'lucide-react';
+import { LayoutDashboard, PawPrint, HeartPulse, CalendarDays, Stethoscope, MessagesSquare, Languages, Crown } from 'lucide-react';
 import { ToastProvider } from '../components/Toast';
 
 const NAV_ITEMS = [
@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/care-schedules', label: 'Care Schedules', icon: CalendarDays },
   { to: '/vet-directory', label: 'Vet Directory', icon: Stethoscope },
   { to: '/expert', label: 'Pet Care Expert', icon: MessagesSquare },
+  { to: '/pricing', label: 'Pricing', icon: Crown },
   { to: '/translate', label: 'Translate', icon: Languages },
 ];
 
