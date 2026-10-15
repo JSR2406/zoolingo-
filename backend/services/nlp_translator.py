@@ -1,10 +1,14 @@
-import random
+import hashlib
 
 
 class NLPTranslator:
     """
     Comprehensive NLP Translator for animal sounds to human language.
     Supports multiple animals with all emotion states and varied responses.
+
+    Translation selection is deterministic: the same (animal, emotion) pair
+    always returns the same translation, so the output is predictable and
+    "exact as per requirement" for a given detected state.
     """
 
     def __init__(self):
@@ -969,6 +973,17 @@ class NLPTranslator:
             ],
         }
 
+    def _deterministic_choice(self, options, seed_string):
+        """
+        Select one option from a list deterministically based on a seed string.
+        Same (options, seed_string) always returns the same option.
+        """
+        if not options:
+            return ""
+        digest = hashlib.sha256(seed_string.encode("utf-8")).hexdigest()
+        index = int(digest[:8], 16) % len(options)
+        return options[index]
+
     def translate(self, animal, emotion):
         """
         Translate animal + emotion to a natural language sentence.
@@ -978,13 +993,15 @@ class NLPTranslator:
             emotion: The detected emotion
 
         Returns:
-            A natural language translation string
+            A natural language translation string (deterministic per animal+emotion)
         """
         try:
+            seed_string = f"{animal}:{emotion}"
+
             # Try exact match first
             animal_mappings = self.mappings.get(animal, {})
             if animal_mappings and emotion in animal_mappings:
-                return random.choice(animal_mappings[emotion])
+                return self._deterministic_choice(animal_mappings[emotion], seed_string)
 
             # If emotion not found for animal, try similar emotions
             similar_emotions = {
@@ -1005,14 +1022,18 @@ class NLPTranslator:
             if emotion in similar_emotions:
                 for similar in similar_emotions[emotion]:
                     if similar in animal_mappings:
-                        return random.choice(animal_mappings[similar])
+                        return self._deterministic_choice(
+                            animal_mappings[similar], seed_string
+                        )
 
             # Try unknown animal with specific emotion
             if emotion in self.unknown_animal_responses:
-                return random.choice(self.unknown_animal_responses[emotion])
+                return self._deterministic_choice(
+                    self.unknown_animal_responses[emotion], seed_string
+                )
 
             # Final fallback
-            return random.choice(self.default_responses)
+            return self._deterministic_choice(self.default_responses, seed_string)
 
         except Exception as e:
             print(f"Translation error: {e}")

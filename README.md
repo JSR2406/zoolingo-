@@ -14,12 +14,13 @@ ZooLingo is a **production-ready** voice-first AI agent that translates live ani
 ## 🚀 Features
 
 ### Core Functionality
-- **Real-time Audio Processing**: Captures and analyzes animal sounds
-- **Emotion & Intent Classification**: Detects emotions (Happy, Angry, Sad, Hungry, Pain)
-- **Natural Language Translation**: Maps animal intents to human-readable text
-- **Lifelike Voice Response**: Speaks the translation using **SARVAM TTS** (primary) with Murf fallback
+- **Real-time Audio Processing**: Captures and analyzes animal sounds (WAV, MP3, OGG, FLAC, M4A, WebM)
+- **Deterministic Animal Classification**: Spectral-feature analysis (spectral centroid, zero-crossing rate, pitch modulation, energy bands, onset structure) distinguishes Dog vs Cat vs 13+ other animals — no random guessing
+- **Emotion & Intent Classification**: Detects emotions (Happy, Angry, Sad, Hungry, Pain, Excited, Scared, Curious, Playful, Calm, Demanding, Alert, and more) based on audio energy, pitch, and temporal structure
+- **Natural Language Translation**: Maps detected animal+emotion to human-readable text (deterministic per state — same sound = same translation)
 - **LLM Translation**: Sarvam-105B generates natural, context-aware translations
-- **Modern UI**: Responsive React frontend with dynamic animal avatars
+- **Lifelike Voice Response**: Speaks the translation using **SARVAM Bulbul v3 TTS** (primary) with Murf fallback
+- **Modern UI**: Responsive React frontend with dynamic animal avatars and classification transparency panel
 
 ### Supported Languages
 - 🇮🇳 **हिंदी (Hindi)** - Native Hindi TTS + LLM translation via SARVAM

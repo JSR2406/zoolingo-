@@ -8,10 +8,20 @@ import DemoSoundSelector from './components/DemoSoundSelector';
 import LanguageSelector from './components/LanguageSelector';
 import ElevenLabsDemo from './components/ElevenLabsDemo';
 import VoiceSelector from './components/VoiceSelector';
-import { ToastProvider, useToast } from './components/Toast';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+import AppShell from './layout/AppShell';
+import Dashboard from './pages/Dashboard';
+import Pets from './pages/Pets';
+import Health from './pages/Health';
+import CareSchedules from './pages/CareSchedules';
+import VetDirectory from './pages/VetDirectory';
+import Expert from './pages/Expert';
+
+import { useToast } from './components/Toast';
 
 // API base URL - adjust based on environment
-const API_BASE = import.meta.env.VITE_API_URL || '';
+export const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // Intense emotions map to the "_intense" demo audio variant
 const INTENSE_EMOTIONS = new Set([
@@ -34,6 +44,7 @@ function AppContent() {
     const [expectedSound, setExpectedSound] = useState(null);
     const [voice, setVoice] = useState('shubh');
     const [availableVoices, setAvailableVoices] = useState({});
+    const [showDetails, setShowDetails] = useState(false);
     const audioRef = useRef(null);
     const toast = useToast();
 
@@ -394,6 +405,47 @@ function AppContent() {
                                                 Play Sample
                                             </button>
                                         )}
+                                        {result.classifier && result.classifier !== "yamnet" && (
+                                            <button
+                                                onClick={() => setShowDetails(!showDetails)}
+                                                className="flex items-center gap-1 text-text-secondary hover:text-primary transition-colors text-xs"
+                                            >
+                                                {showDetails ? '▲' : '▼'} Classification Details
+                                            </button>
+                                        )}
+                                        {showDetails && result.animal_scores && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                exit={{ opacity: 0, height: 0 }}
+                                                className="mt-3 space-y-1"
+                                            >
+                                                <p className="text-xs text-text-muted uppercase tracking-wider mb-1">
+                                                    Top animal matches
+                                                </p>
+                                                {Object.entries(result.animal_scores).map(([animal, score]) => (
+                                                    <div
+                                                        key={animal}
+                                                        className="flex items-center justify-between text-xs"
+                                                    >
+                                                        <span className="text-text-secondary">
+                                                            {animal}
+                                                        </span>
+                                                        <div className="flex-1 mx-3 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-primary rounded-full"
+                                                                style={{
+                                                                    width: Math.min(100, (score / 10) * 100) + "%",
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <span className="w-8 text-right text-text-muted">
+                                                            {score.toFixed(1)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </motion.div>
+                                        )}
                                     </div>
                                 </motion.div>
 
@@ -510,9 +562,19 @@ function AppContent() {
 
 function App() {
     return (
-        <ToastProvider>
-            <AppContent />
-        </ToastProvider>
+        <BrowserRouter>
+            <Routes>
+                <Route element={<AppShell />}>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/pets" element={<Pets />} />
+                    <Route path="/health" element={<Health />} />
+                    <Route path="/care-schedules" element={<CareSchedules />} />
+                    <Route path="/vet-directory" element={<VetDirectory />} />
+                    <Route path="/expert" element={<Expert />} />
+                    <Route path="/translate" element={<AppContent />} />
+                </Route>
+            </Routes>
+        </BrowserRouter>
     );
 }
 
