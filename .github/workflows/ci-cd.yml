@@ -51,6 +51,8 @@ jobs:
           ENVIRONMENT: test
           SARVAM_API_KEY: test_key
         run: |
+          python --version
+          pip list
           pytest tests/ -v --cov=. --cov-report=xml --cov-report=term
 
       - name: Upload coverage
@@ -78,7 +80,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./frontend
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Build (production)
         working-directory: ./frontend
