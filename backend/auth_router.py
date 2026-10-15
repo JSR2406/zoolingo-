@@ -1,22 +1,24 @@
 """
-Authentication routes for ZooLingo.
+Authentication routes for ZooLingo using Supabase Auth.
 
 Endpoints:
-- POST /auth/register - Create a new account
-- POST /auth/login - Obtain a JWT access token
-- GET /auth/me - Get the current user's profile
+- GET /auth/me - Get the current user's profile (requires valid Supabase JWT)
+- POST /auth/profile - Create or update the user's profile in the profiles table
+
+Note: User signup/login happens client-side via supabase-js (Supabase Auth).
+The backend only verifies the JWT and manages the profiles table.
 """
 
+import logging
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field, EmailStr
 
 from auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
-    authenticate_user,
-    create_access_token,
-    create_user,
+    create_user_profile,
     get_current_user,
-    get_user_by_id,
+    get_user_profile,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -27,20 +29,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # ---------------------------------------------------------------------------
 
 
-class UserRegister(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
-
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    expires_in: int
+class ProfileUpdate(BaseModel):
+    email: Optional[str] = None
+    plan: Optional[str] = None
 
 
 class UserOut(BaseModel):
@@ -59,50 +50,56 @@ class UserOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(payload: UserRegister):
-    """Create a new user account."""
-    try:
-        user = create_user(payload.email, payload.password)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
-    return UserOut(
-        id=str(user["id"]),
-        email=str(user["email"]),
-        plan=str(user.get("plan", "free")),
-        conversions_used=int(user.get("conversions_used", 0)),
-        created_at=str(user["created_at"]),
-    )
-
-
-@router.post("/login", response_model=TokenResponse)
-async def login(payload: UserLogin):
-    """Authenticate and return a JWT access token."""
-    user = authenticate_user(payload.email, payload.password)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    access_token = create_access_token(subject=str(user["id"]))
-    return TokenResponse(
-        access_token=access_token,
-        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
-
-
 @router.get("/me", response_model=UserOut)
 async def me(current_user: dict = Depends(get_current_user)):
     """Return the currently authenticated user's profile."""
     return UserOut(
         id=str(current_user["id"]),
-        email=str(current_user["email"]),
+        email=str(current_user.get("email", "")),
         plan=str(current_user.get("plan", "free")),
         conversions_used=int(current_user.get("conversions_used", 0)),
         created_at=str(current_user["created_at"]),
+    )
+
+
+@router.post("/profile", response_model=UserOut)
+async def upsert_profile(
+    payload: ProfileUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Create or update the current user's profile in the profiles table."""
+    user_id = str(current_user["id"])
+
+    # Build update payload
+    update_data = {}
+    if payload.email is not None:
+        update_data["email"] = payload.email
+    if payload.plan is not None:
+        update_data["plan"] = payload.plan
+
+    # Try to persist to Supabase profiles table
+    from supabase_client import supabase_client
+
+    if supabase_client.enabled:
+        try:
+            supabase_client._client.table("profiles").upsert(
+                {"id": user_id, **update_data}
+            ).execute()
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to upsert profile to Supabase: {e}")
+
+    # Update in-memory cache
+    profile = create_user_profile(
+        user_id,
+        email=update_data.get("email", str(current_user.get("email", ""))),
+        plan=update_data.get("plan", str(current_user.get("plan", "free"))),
+    )
+
+    return UserOut(
+        id=str(profile["id"]),
+        email=str(profile.get("email", "")),
+        plan=str(profile.get("plan", "free")),
+        conversions_used=int(profile.get("conversions_used", 0)),
+        created_at=str(profile["created_at"]),
     )

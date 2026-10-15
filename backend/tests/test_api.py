@@ -2,17 +2,21 @@ import pytest
 from fastapi.testclient import TestClient
 import os
 import sys
+from jose import jwt
+from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import app as app_module
 from app import app
 
 client = TestClient(app)
 
 # Use a fixed test secret for deterministic auth in tests
 os.environ["AUTH_SECRET_KEY"] = "test_secret_key_for_development"
+os.environ["SUPABASE_JWT_SECRET"] = "test_supabase_jwt_secret_for_development"
 
 # Mock TTS to return dummy audio bytes so tests can verify conversion consumption
 MOCK_AUDIO_BYTES = b"fake_audio_bytes"
@@ -24,18 +28,27 @@ def mock_generate_tts_audio(text, speaker=None, language=None):
 
 
 # Apply the mock to the app module's generate_tts_audio function
-app.generate_tts_audio = mock_generate_tts_audio
+app_module.generate_tts_audio = mock_generate_tts_audio
 
 
-def get_auth_headers(email="test@example.com", password="TestPass123!"):
-    """Register and login a user, return auth headers."""
-    # Register (may fail if already exists, which is fine)
-    client.post("/auth/register", json={"email": email, "password": password})
-    # Login
-    resp = client.post("/auth/login", json={"email": email, "password": password})
-    assert resp.status_code == 200, f"Login failed: {resp.text}"
-    token = resp.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+def make_supabase_jwt(user_id: str, email: str = "test@example.com") -> str:
+    """Create a mock Supabase Auth JWT for testing."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "iat": now,
+        "exp": now + timedelta(hours=1),
+        "role": "authenticated",
+    }
+    return jwt.encode(payload, os.environ["SUPABASE_JWT_SECRET"], algorithm="HS256")
+
+
+def get_auth_headers(email="test@example.com"):
+    """Create auth headers with a mock Supabase JWT."""
+    user_id = "user_" + str(abs(hash(email)))[:16]
+    token = make_supabase_jwt(user_id, email)
+    return {"Authorization": f"Bearer {token}"}, user_id
 
 
 def test_root_endpoint():
@@ -68,67 +81,26 @@ def test_config_endpoint():
     assert "allowed_extensions" in data
 
 
-def test_auth_register():
-    """Test user registration"""
-    resp = client.post(
-        "/auth/register", json={"email": "newuser@example.com", "password": "NewPass123!"}
-    )
-    assert resp.status_code == 201, f"Register failed: {resp.text}"
-    data = resp.json()
-    assert data["email"] == "newuser@example.com"
-    assert data["plan"] == "free"
-    assert data["conversions_used"] == 0
-
-
-def test_auth_register_duplicate():
-    """Test registering duplicate email fails"""
-    client.post(
-        "/auth/register", json={"email": "dup@example.com", "password": "DupPass123!"}
-    )
-    resp = client.post(
-        "/auth/register", json={"email": "dup@example.com", "password": "DupPass123!"}
-    )
-    assert resp.status_code == 400
-
-
-def test_auth_login():
-    """Test user login returns token"""
-    client.post(
-        "/auth/register", json={"email": "loginuser@example.com", "password": "LoginPass123!"}
-    )
-    resp = client.post(
-        "/auth/login", json={"email": "loginuser@example.com", "password": "LoginPass123!"}
-    )
-    assert resp.status_code == 200, f"Login failed: {resp.text}"
-    data = resp.json()
-    assert "access_token" in data
-    assert data["token_type"] == "bearer"
-
-
-def test_auth_login_wrong_password():
-    """Test login with wrong password fails"""
-    client.post(
-        "/auth/register", json={"email": "wrongpw@example.com", "password": "CorrectPass123!"}
-    )
-    resp = client.post(
-        "/auth/login", json={"email": "wrongpw@example.com", "password": "WrongPass123!"}
-    )
-    assert resp.status_code == 401
-
-
 def test_auth_me():
-    """Test get current user profile"""
-    headers = get_auth_headers("meuser@example.com", "MePass123!")
+    """Test get current user profile with valid Supabase JWT"""
+    headers, user_id = get_auth_headers("meuser@example.com")
     resp = client.get("/auth/me", headers=headers)
     assert resp.status_code == 200, f"Me failed: {resp.text}"
     data = resp.json()
-    assert data["email"] == "meuser@example.com"
+    assert data["id"] == user_id
     assert data["plan"] == "free"
+    assert data["conversions_used"] == 0
 
 
 def test_auth_me_unauthenticated():
     """Test /auth/me without token returns 401"""
     resp = client.get("/auth/me")
+    assert resp.status_code == 401
+
+
+def test_auth_me_invalid_token():
+    """Test /auth/me with invalid token returns 401"""
+    resp = client.get("/auth/me", headers={"Authorization": "Bearer invalid_token"})
     assert resp.status_code == 401
 
 
@@ -148,7 +120,7 @@ def test_process_audio_requires_auth():
 
 def test_process_audio_valid_mock():
     """Test process audio with valid mock audio file (authenticated)"""
-    headers = get_auth_headers("audio_user@example.com", "AudioPass123!")
+    headers, _ = get_auth_headers("audio_user@example.com")
 
     # Create a minimal WAV file header (44 bytes)
     wav_header = (
@@ -177,7 +149,7 @@ def test_process_audio_valid_mock():
 
 def test_process_audio_consumes_quota():
     """Test that free tier users are blocked after 2 conversions"""
-    headers = get_auth_headers("quota_user@example.com", "QuotaPass123!")
+    headers, _ = get_auth_headers("quota_user@example.com")
 
     wav_header = (
         b"RIFF" + (36).to_bytes(4, "little") + b"WAVE" + b"fmt "
@@ -211,7 +183,7 @@ def test_process_audio_consumes_quota():
 
 def test_process_audio_invalid_extension():
     """Test process audio with invalid file extension (authenticated)"""
-    headers = get_auth_headers("ext_user@example.com", "ExtPass123!")
+    headers, _ = get_auth_headers("ext_user@example.com")
     files = {"file": ("test.txt", b"fake content", "text/plain")}
     response = client.post("/api/process-audio", files=files, headers=headers)
     assert response.status_code == 400
@@ -220,6 +192,6 @@ def test_process_audio_invalid_extension():
 
 def test_process_audio_no_file():
     """Test process audio endpoint without file (authenticated)"""
-    headers = get_auth_headers("nofile_user@example.com", "NoFilePass123!")
+    headers, _ = get_auth_headers("nofile_user@example.com")
     response = client.post("/api/process-audio", headers=headers)
     assert response.status_code == 422  # Unprocessable Entity
