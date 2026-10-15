@@ -29,6 +29,7 @@ from services.elevenlabs_sfx import sfx_client
 from petcare.database import init_db
 from petcare.router import petcare_router
 from auth_router import router as auth_router
+from billing_router import router as billing_router
 from auth import (
     get_current_user,
     get_optional_user,
@@ -183,6 +184,7 @@ os.makedirs(config.UPLOAD_DIR, exist_ok=True)
 init_db()
 app.include_router(petcare_router)
 app.include_router(auth_router)
+app.include_router(billing_router)
 
 
 # Request logging middleware

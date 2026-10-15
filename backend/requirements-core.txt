@@ -29,6 +29,10 @@ python-jose[cryptography]==3.3.0
 argon2-cffi==23.1.0
 email-validator==2.2.0
 
+# Payments (Stripe + Razorpay for India)
+stripe==15.4.0
+razorpay==1.4.2
+
 # Testing
 pytest==7.4.3
 pytest-cov==4.1.0

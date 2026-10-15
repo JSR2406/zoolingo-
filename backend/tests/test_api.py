@@ -195,3 +195,124 @@ def test_process_audio_no_file():
     headers, _ = get_auth_headers("nofile_user@example.com")
     response = client.post("/api/process-audio", headers=headers)
     assert response.status_code == 422  # Unprocessable Entity
+
+
+# ---------------------------------------------------------------------------
+# Billing tests
+# ---------------------------------------------------------------------------
+
+def test_billing_plans():
+    """Test listing subscription plans"""
+    response = client.get("/billing/plans")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) >= 3  # free, pro, premium
+    plan_ids = {p["id"] for p in data}
+    assert "free" in plan_ids
+    assert "pro" in plan_ids
+    assert "premium" in plan_ids
+
+    # Verify free plan details
+    free_plan = next(p for p in data if p["id"] == "free")
+    assert free_plan["price_monthly_inr"] == 0
+    assert free_plan["conversion_quota"] == 2
+
+    # Verify Pro plan details
+    pro_plan = next(p for p in data if p["id"] == "pro")
+    assert pro_plan["price_monthly_inr"] == 599
+
+    # Verify Premium plan details
+    premium_plan = next(p for p in data if p["id"] == "premium")
+    assert premium_plan["price_monthly_inr"] == 1599
+
+
+def test_billing_me():
+    """Test getting current user's billing info"""
+    headers, _ = get_auth_headers("billing_user@example.com")
+    response = client.get("/billing/me", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["plan"] == "free"
+    assert data["conversion_quota"] == 2
+    assert data["conversions_used"] == 0
+    assert data["conversions_remaining"] == 2
+
+
+def test_billing_usage():
+    """Test usage endpoint"""
+    headers, _ = get_auth_headers("usage_user@example.com")
+    response = client.get("/billing/usage", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["plan"] == "free"
+    assert data["conversions_used"] == 0
+    assert data["conversion_quota"] == 2
+    assert data["conversions_remaining"] == 2
+    assert data["allowed"] is True
+
+
+def test_billing_checkout_requires_auth():
+    """Test checkout endpoint requires authentication"""
+    response = client.post(
+        "/billing/checkout",
+        json={
+            "plan": "pro",
+            "success_url": "https://example.com/success",
+            "cancel_url": "https://example.com/cancel",
+        },
+    )
+    assert response.status_code == 401
+
+
+def test_billing_checkout_free_plan_rejected():
+    """Test that upgrading to free plan is rejected"""
+    headers, _ = get_auth_headers("checkout_user@example.com")
+    response = client.post(
+        "/billing/checkout",
+        json={
+            "plan": "free",
+            "success_url": "https://example.com/success",
+            "cancel_url": "https://example.com/cancel",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 400
+
+
+def test_billing_checkout_unknown_plan():
+    """Test checkout with unknown plan"""
+    headers, _ = get_auth_headers("checkout_user2@example.com")
+    response = client.post(
+        "/billing/checkout",
+        json={
+            "plan": "nonexistent",
+            "success_url": "https://example.com/success",
+            "cancel_url": "https://example.com/cancel",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 400
+
+
+def test_billing_checkout_no_stripe_key():
+    """Test checkout fails gracefully when Stripe not configured"""
+    headers, _ = get_auth_headers("checkout_user3@example.com")
+    response = client.post(
+        "/billing/checkout",
+        json={
+            "plan": "pro",
+            "success_url": "https://example.com/success",
+            "cancel_url": "https://example.com/cancel",
+        },
+        headers=headers,
+    )
+    # Without STRIPE_SECRET_KEY, Stripe adapter raises ValueError -> 400
+    assert response.status_code == 400
+
+
+def test_billing_cancel_no_subscription():
+    """Test cancel subscription when none exists"""
+    headers, _ = get_auth_headers("cancel_user@example.com")
+    response = client.post("/billing/cancel", headers=headers)
+    assert response.status_code == 400
+
