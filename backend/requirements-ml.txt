@@ -6,3 +6,7 @@ tensorflow-cpu==2.15.0
 tensorflow-hub==0.16.1
 scikit-learn==1.3.2
 av==11.0.0
+
+# Optional - librosa for MFCC extraction (app works without it using
+# numpy/scipy-based spectral features from audio_processor.py)
+librosa==0.10.1
