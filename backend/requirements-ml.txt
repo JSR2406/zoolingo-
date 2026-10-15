@@ -1,0 +1,8 @@
+# ZooLingo Backend - Optional ML Requirements
+# These packages provide YAMNet / TensorFlow classification.
+# The app falls back to deterministic heuristic classification if unavailable.
+
+tensorflow-cpu==2.15.0
+tensorflow-hub==0.16.1
+scikit-learn==1.3.2
+av==11.0.0
