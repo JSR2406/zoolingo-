@@ -22,20 +22,33 @@ logger = logging.getLogger(__name__)
 # specific class is absent.
 ANIMAL_CLASS_MAP = {
     "Dog": {
-        "Dog": 1.0, "Bark": 1.0, "Bow-wow": 1.0, "Yip": 0.9, "Howl": 0.7,
-        "Whimper (dog)": 0.9, "Canidae, dogs, wolves": 0.5,
+        "Dog": 1.0,
+        "Bark": 1.0,
+        "Bow-wow": 1.0,
+        "Yip": 0.9,
+        "Howl": 0.7,
+        "Whimper (dog)": 0.9,
+        "Canidae, dogs, wolves": 0.5,
     },
     "Cat": {
-        "Cat": 1.0, "Meow": 1.0, "Purr": 0.9, "Hiss": 0.8, "Caterwaul": 0.9,
+        "Cat": 1.0,
+        "Meow": 1.0,
+        "Purr": 0.9,
+        "Hiss": 0.8,
+        "Caterwaul": 0.9,
     },
     "Cow": {
-        "Cattle, bovinae": 1.0, "Moo": 1.0,
+        "Cattle, bovinae": 1.0,
+        "Moo": 1.0,
     },
     "Pig": {
-        "Pig": 1.0, "Oink": 0.9, "Grunt": 0.6,
+        "Pig": 1.0,
+        "Oink": 0.9,
+        "Grunt": 0.6,
     },
     "Horse": {
-        "Horse": 1.0, "Neigh, whinny": 1.0,
+        "Horse": 1.0,
+        "Neigh, whinny": 1.0,
     },
     "Sheep": {
         "Sheep": 1.0,
@@ -44,20 +57,28 @@ ANIMAL_CLASS_MAP = {
         "Goat": 1.0,
     },
     "Chicken": {
-        "Chicken, rooster": 1.0, "Cluck": 0.9, "Crowing, cock-a-doodle-doo": 1.0,
+        "Chicken, rooster": 1.0,
+        "Cluck": 0.9,
+        "Crowing, cock-a-doodle-doo": 1.0,
     },
     "Duck": {
-        "Duck": 1.0, "Quack": 1.0,
+        "Duck": 1.0,
+        "Quack": 1.0,
     },
     "Bird": {
-        "Bird": 1.0, "Bird vocalization, bird call, bird song": 1.0,
-        "Squawk": 0.8, "Crow": 0.8, "Pigeon, dove": 0.7,
+        "Bird": 1.0,
+        "Bird vocalization, bird call, bird song": 1.0,
+        "Squawk": 0.8,
+        "Crow": 0.8,
+        "Pigeon, dove": 0.7,
     },
     "Lion": {
-        "Roaring cats (lions, tigers)": 1.0, "Roar": 1.0,
+        "Roaring cats (lions, tigers)": 1.0,
+        "Roar": 1.0,
     },
     "Wolf": {
-        "Canidae, dogs, wolves": 0.6, "Howl": 0.7,
+        "Canidae, dogs, wolves": 0.6,
+        "Howl": 0.7,
     },
     "Turkey": {
         "Turkey": 1.0,
@@ -95,8 +116,15 @@ EMOTION_CLASS_MAP = {
 
 # Emotions considered "high intensity" for calm/intense variant selection
 INTENSE_EMOTIONS = {
-    "Angry", "Excited", "Scared", "Pain", "Aggressive",
-    "Alert", "Demanding", "Bossy", "Mischievous",
+    "Angry",
+    "Excited",
+    "Scared",
+    "Pain",
+    "Aggressive",
+    "Alert",
+    "Demanding",
+    "Bossy",
+    "Mischievous",
 }
 
 # Fallback emotions when no event-level emotion was detected
@@ -161,9 +189,14 @@ class YAMNetAnimalClassifier:
             # Download the canonical class map when models/yamnet_class_map.csv
             # is missing so the service is self-sufficient.
             import urllib.request
-            url = ("https://raw.githubusercontent.com/tensorflow/models/master/"
-                   "research/audioset/yamnet/yamnet_class_map.csv")
-            dest_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models")
+
+            url = (
+                "https://raw.githubusercontent.com/tensorflow/models/master/"
+                "research/audioset/yamnet/yamnet_class_map.csv"
+            )
+            dest_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "..", "models"
+            )
             os.makedirs(dest_dir, exist_ok=True)
             dest = os.path.join(dest_dir, "yamnet_class_map.csv")
             logger.info("Downloading YAMNet class map: %s", url)
@@ -195,7 +228,7 @@ class YAMNetAnimalClassifier:
     def _audio_energy(self, data) -> float:
         if data is None or len(data) == 0:
             return 0.0
-        return float(np.sqrt(np.mean(data ** 2)))
+        return float(np.sqrt(np.mean(data**2)))
 
     def classify(self, file_path, top_k=10):
         """
@@ -240,7 +273,9 @@ class YAMNetAnimalClassifier:
             for animal, aliases in ANIMAL_CLASS_MAP.items():
                 weight = aliases.get(class_name)
                 if weight:
-                    animal_votes[animal] = animal_votes.get(animal, 0.0) + weight * score
+                    animal_votes[animal] = (
+                        animal_votes.get(animal, 0.0) + weight * score
+                    )
 
             # emotion votes
             emotion_weights = EMOTION_CLASS_MAP.get(class_name)
@@ -269,7 +304,10 @@ class YAMNetAnimalClassifier:
         }
         logger.info(
             "YAMNet classify %s -> %s-%s (conf=%s)",
-            os.path.basename(file_path), animal, emotion, animal_conf,
+            os.path.basename(file_path),
+            animal,
+            emotion,
+            animal_conf,
         )
         return result
 

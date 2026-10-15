@@ -75,7 +75,9 @@ class ElevenLabsSFX:
                 return resp.read()
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:500]
-            raise RuntimeError(f"ElevenLabs sound-generation error {e.code}: {detail}") from e
+            raise RuntimeError(
+                f"ElevenLabs sound-generation error {e.code}: {detail}"
+            ) from e
 
     @staticmethod
     def pcm_to_samples(pcm_bytes: bytes):

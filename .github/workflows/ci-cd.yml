@@ -6,132 +6,210 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
 jobs:
+  # ------------------------------------------------------------------
+  # 1. Backend tests
+  # ------------------------------------------------------------------
   test-backend:
     name: Test Backend
     runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-        
-    - name: Cache Python dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-    
-    - name: Install dependencies
-      working-directory: ./backend
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Run tests
-      working-directory: ./backend
-      env:
-        MURF_API_KEY: test_key
-        ENVIRONMENT: test
-      run: |
-        pytest tests/ -v --cov=. --cov-report=xml --cov-report=term
-    
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./backend/coverage.xml
-        flags: backend
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        working-directory: ./backend
+        env:
+          MURF_API_KEY: test_key
+          ENVIRONMENT: test
+          SARVAM_API_KEY: test_key
+        run: |
+          pytest tests/ -v --cov=. --cov-report=xml --cov-report=term
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./backend/coverage.xml
+          flags: backend
+
+  # ------------------------------------------------------------------
+  # 2. Frontend tests + build
+  # ------------------------------------------------------------------
   test-frontend:
     name: Test Frontend
     runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
-    
-    - name: Install dependencies
-      working-directory: ./frontend
-      run: npm ci
-    
-    - name: Build
-      working-directory: ./frontend
-      run: npm run build
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build (production)
+        working-directory: ./frontend
+        run: npm run build
+
+  # ------------------------------------------------------------------
+  # 3. Lint + code quality
+  # ------------------------------------------------------------------
   lint:
     name: Lint Code
     runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-    
-    - name: Install linting tools
-      run: |
-        pip install black flake8 mypy
-    
-    - name: Run Black
-      working-directory: ./backend
-      run: black --check .
-    
-    - name: Run Flake8
-      working-directory: ./backend
-      run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install linting tools
+        run: |
+          pip install black==23.12.0 flake8==6.1.0 mypy==1.7.1
+
+      - name: Run Black (check)
+        working-directory: ./backend
+        run: black --check .
+
+      - name: Run Flake8
+        working-directory: ./backend
+        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Run MyPy
+        working-directory: ./backend
+        run: mypy . --ignore-missing-imports || true
+
+  # ------------------------------------------------------------------
+  # 4. MLOps — model + dependency validation
+  # ------------------------------------------------------------------
+  mlops:
+    name: MLOps Validation
+    runs-on: ubuntu-latest
+    needs: [test-backend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify YAMNet class map present
+        working-directory: ./backend
+        run: |
+          if [ ! -f models/yamnet_class_map.csv ]; then
+            echo "::warning::models/yamnet_class_map.csv missing — YAMNet will download it at first cold start"
+          else
+            echo "✅ YAMNet class map present"
+          fi
+
+      - name: Dependency vulnerability scan (safety)
+        working-directory: ./backend
+        run: |
+          pip install safety==2.3.5
+          safety check --file requirements.txt || true
+
+      - name: Static security scan (bandit)
+        working-directory: ./backend
+        run: |
+          pip install bandit==1.7.5
+          bandit -r . -ll || true
+
+  # ------------------------------------------------------------------
+  # 5. Docker image builds (gated on tests + lint + mlops)
+  # ------------------------------------------------------------------
   docker-build:
     name: Build Docker Images
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend, lint]
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-    
-    - name: Build backend image
-      uses: docker/build-push-action@v4
-      with:
-        context: ./backend
-        push: false
-        tags: zoolingo-backend:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-    
-    - name: Build frontend image
-      uses: docker/build-push-action@v4
-      with:
-        context: ./frontend
-        push: false
-        tags: zoolingo-frontend:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+    needs: [test-backend, test-frontend, lint, mlops]
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          tags: ghcr.io/${{ github.repository_owner }}/zoolingo-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          tags: ghcr.io/${{ github.repository_owner }}/zoolingo-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ------------------------------------------------------------------
+  # 6. Deploy to production (Vercel) — main branch only
+  # ------------------------------------------------------------------
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
     needs: [docker-build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
+
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Deploy notification
-      run: |
-        echo "Ready for deployment to production"
-        echo "Configure your deployment steps here (e.g., AWS, GCP, Azure)"
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Deploy to Vercel production
+        run: |
+          cd frontend
+          vercel --prod --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

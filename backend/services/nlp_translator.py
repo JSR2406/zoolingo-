@@ -1,11 +1,12 @@
 import random
 
+
 class NLPTranslator:
     """
     Comprehensive NLP Translator for animal sounds to human language.
     Supports multiple animals with all emotion states and varied responses.
     """
-    
+
     def __init__(self):
         # Comprehensive animal-emotion-translation mappings
         self.mappings = {
@@ -122,7 +123,6 @@ class NLPTranslator:
                     "You can't catch me!",
                 ],
             },
-            
             # ============ CATS ============
             "Cat": {
                 "Happy": [
@@ -234,7 +234,6 @@ class NLPTranslator:
                     "Your laptop is less important than me!",
                 ],
             },
-            
             # ============ COWS ============
             "Cow": {
                 "Happy": [
@@ -310,7 +309,6 @@ class NLPTranslator:
                     "Everything is as it should be.",
                 ],
             },
-            
             # ============ LIONS ============
             "Lion": {
                 "Happy": [
@@ -386,7 +384,6 @@ class NLPTranslator:
                     "Born to rule, destined to reign!",
                 ],
             },
-            
             # ============ BIRDS ============
             "Bird": {
                 "Happy": [
@@ -474,7 +471,6 @@ class NLPTranslator:
                     "Scatter! Everyone scatter!",
                 ],
             },
-            
             # ============ HORSES ============
             "Horse": {
                 "Happy": [
@@ -562,7 +558,6 @@ class NLPTranslator:
                     "Perfect day for rest.",
                 ],
             },
-            
             # ============ ELEPHANTS ============
             "Elephant": {
                 "Happy": [
@@ -626,7 +621,6 @@ class NLPTranslator:
                     "Please, let me rest awhile.",
                 ],
             },
-            
             # ============ SHEEP ============
             "Sheep": {
                 "Happy": [
@@ -666,7 +660,6 @@ class NLPTranslator:
                     "My four stomachs need filling!",
                 ],
             },
-            
             # ============ GOATS ============
             "Goat": {
                 "Happy": [
@@ -706,7 +699,6 @@ class NLPTranslator:
                     "You think you can push me?",
                 ],
             },
-            
             # ============ PIGS ============
             "Pig": {
                 "Happy": [
@@ -746,7 +738,6 @@ class NLPTranslator:
                     "I can find anything with this snout!",
                 ],
             },
-            
             # ============ CHICKENS ============
             "Chicken": {
                 "Happy": [
@@ -786,7 +777,6 @@ class NLPTranslator:
                     "Fall in line!",
                 ],
             },
-            
             # ============ DUCKS ============
             "Duck": {
                 "Happy": [
@@ -814,7 +804,6 @@ class NLPTranslator:
                     "More snacks or face the quacks!",
                 ],
             },
-
             # ============ MONKEY ============
             "Monkey": {
                 "Happy": [
@@ -854,7 +843,6 @@ class NLPTranslator:
                     "Last warning, leave now!",
                 ],
             },
-            
             # ============ PARROT ============
             "Parrot": {
                 "Happy": [
@@ -894,7 +882,6 @@ class NLPTranslator:
                     "Feathers ruffled in anger!",
                 ],
             },
-            
             # ============ WOLF ============
             "Wolf": {
                 "Happy": [
@@ -935,7 +922,7 @@ class NLPTranslator:
                 ],
             },
         }
-        
+
         # Default responses for any unrecognized input
         self.default_responses = [
             "I'm trying to communicate with you!",
@@ -949,27 +936,47 @@ class NLPTranslator:
             "Animals have feelings too!",
             "We speak in our own way!",
         ]
-        
+
         # Unknown animal default messages
         self.unknown_animal_responses = {
-            "Happy": ["I'm feeling great today!", "Life is good!", "Everything is wonderful!"],
+            "Happy": [
+                "I'm feeling great today!",
+                "Life is good!",
+                "Everything is wonderful!",
+            ],
             "Angry": ["Back off! I'm upset!", "Leave me alone!", "I'm warning you!"],
-            "Sad": ["I'm feeling down...", "Something's not right.", "I'm a bit lonely."],
+            "Sad": [
+                "I'm feeling down...",
+                "Something's not right.",
+                "I'm a bit lonely.",
+            ],
             "Hungry": ["I'm so hungry!", "Food please!", "Time to eat!"],
             "Pain": ["I'm not feeling well.", "Something hurts.", "I need help."],
-            "Excited": ["So much excitement!", "This is amazing!", "I can't contain myself!"],
-            "Scared": ["I'm frightened!", "Help, I'm scared!", "Something scary is near!"],
-            "Curious": ["What's that over there?", "Let me investigate!", "I'm intrigued!"],
+            "Excited": [
+                "So much excitement!",
+                "This is amazing!",
+                "I can't contain myself!",
+            ],
+            "Scared": [
+                "I'm frightened!",
+                "Help, I'm scared!",
+                "Something scary is near!",
+            ],
+            "Curious": [
+                "What's that over there?",
+                "Let me investigate!",
+                "I'm intrigued!",
+            ],
         }
 
     def translate(self, animal, emotion):
         """
         Translate animal + emotion to a natural language sentence.
-        
+
         Args:
             animal: The detected animal type
             emotion: The detected emotion
-            
+
         Returns:
             A natural language translation string
         """
@@ -978,7 +985,7 @@ class NLPTranslator:
             animal_mappings = self.mappings.get(animal, {})
             if animal_mappings and emotion in animal_mappings:
                 return random.choice(animal_mappings[emotion])
-            
+
             # If emotion not found for animal, try similar emotions
             similar_emotions = {
                 "Excited": ["Happy", "Playful"],
@@ -994,36 +1001,37 @@ class NLPTranslator:
                 "Bossy": ["Angry", "Demanding"],
                 "Singing": ["Happy"],
             }
-            
+
             if emotion in similar_emotions:
                 for similar in similar_emotions[emotion]:
                     if similar in animal_mappings:
                         return random.choice(animal_mappings[similar])
-            
+
             # Try unknown animal with specific emotion
             if emotion in self.unknown_animal_responses:
                 return random.choice(self.unknown_animal_responses[emotion])
-            
+
             # Final fallback
             return random.choice(self.default_responses)
-            
+
         except Exception as e:
             print(f"Translation error: {e}")
             return "I am an animal with something important to say!"
-    
+
     def get_supported_animals(self):
         """Return list of all supported animals."""
         return list(self.mappings.keys())
-    
+
     def get_supported_emotions(self):
         """Return list of all supported emotions."""
         all_emotions = set()
         for animal_emotions in self.mappings.values():
             all_emotions.update(animal_emotions.keys())
         return sorted(list(all_emotions))
-    
+
     def get_animal_emotions(self, animal):
         """Get all emotions supported for a specific animal."""
         return list(self.mappings.get(animal, {}).keys())
+
 
 translator = NLPTranslator()

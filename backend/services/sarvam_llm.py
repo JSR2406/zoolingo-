@@ -31,8 +31,15 @@ class SarvamLLMTranslator:
     }
 
     INTENSE_EMOTIONS = {
-        "Angry", "Excited", "Scared", "Pain", "Aggressive",
-        "Alert", "Demanding", "Bossy", "Mischievous",
+        "Angry",
+        "Excited",
+        "Scared",
+        "Pain",
+        "Aggressive",
+        "Alert",
+        "Demanding",
+        "Bossy",
+        "Mischievous",
     }
 
     def __init__(self, api_key: Optional[str] = None):
@@ -70,7 +77,8 @@ class SarvamLLMTranslator:
 
         language = self._language_name(lang_key)
         tone_hint = (
-            "high-energy, urgent" if emotion in self.INTENSE_EMOTIONS
+            "high-energy, urgent"
+            if emotion in self.INTENSE_EMOTIONS
             else "gentle, natural"
         )
 
@@ -85,7 +93,7 @@ class SarvamLLMTranslator:
         user_msg = (
             "Animal: {animal}\n"
             "Emotion: {emotion}\n"
-            "English rendering: \"{text}\"\n"
+            'English rendering: "{text}"\n'
             "Translate the rendering above into {language} as a natural, "
             "first-person sentence."
         ).format(animal=animal, emotion=emotion, text=english_text, language=language)
@@ -102,7 +110,9 @@ class SarvamLLMTranslator:
 
         start = time.time()
         try:
-            resp = requests.post(self.CHAT_URL, headers=self.headers, json=payload, timeout=timeout)
+            resp = requests.post(
+                self.CHAT_URL, headers=self.headers, json=payload, timeout=timeout
+            )
             resp.raise_for_status()
             data = resp.json()
             content = data["choices"][0]["message"]["content"].strip()
@@ -121,8 +131,16 @@ class SarvamLLMTranslator:
             return english_text
 
     def status(self) -> dict:
-        avg = int(self.stats["total_latency_ms"] / self.stats["requests"]) if self.stats["requests"] else 0
-        return {"enabled": bool(self.api_key), "requests": self.stats["requests"], "avg_latency_ms": avg}
+        avg = (
+            int(self.stats["total_latency_ms"] / self.stats["requests"])
+            if self.stats["requests"]
+            else 0
+        )
+        return {
+            "enabled": bool(self.api_key),
+            "requests": self.stats["requests"],
+            "avg_latency_ms": avg,
+        }
 
 
 llm_translator = SarvamLLMTranslator()

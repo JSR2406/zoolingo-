@@ -1,26 +1,25 @@
-FROM node:18-alpine as build
+# syntax=docker/dockerfile:1
+# ZooLingo frontend — production image
+# Build: docker build -t zoolingo-frontend ./frontend
+
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Copy package files
+# Install dependencies (dev deps required for vite build)
 COPY package.json package-lock.json* ./
+RUN npm ci
 
-# Install dependencies
-RUN npm ci --only=production || npm install
-
-# Copy source code
+# Copy source and build
 COPY . .
-
-# Build the application
 RUN npm run build
 
 # Production serve stage
-FROM nginx:alpine
+FROM nginx:alpine AS runtime
 
-# Install curl for health checks
 RUN apk add --no-cache curl
 
-# Copy built assets
+# Copy built static assets
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
@@ -33,4 +32,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
-

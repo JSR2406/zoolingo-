@@ -26,8 +26,12 @@ SAMPLE_RATE = PCM_SAMPLE_RATE
 
 def main():
     parser = argparse.ArgumentParser(description="Generate ElevenLabs demo sounds")
-    parser.add_argument("--force", action="store_true", help="Regenerate even if files exist")
-    parser.add_argument("--species", choices=["dog", "cat"], help="Only generate one species")
+    parser.add_argument(
+        "--force", action="store_true", help="Regenerate even if files exist"
+    )
+    parser.add_argument(
+        "--species", choices=["dog", "cat"], help="Only generate one species"
+    )
     args = parser.parse_args()
 
     client = ElevenLabsSFX(api_key=config.ELEVENLABS_API_KEY)

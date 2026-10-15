@@ -7,11 +7,13 @@ logger = logging.getLogger(__name__)
 # Try to import librosa, but don't fail if not available
 try:
     import librosa
+
     LIBROSA_AVAILABLE = True
     logger.info("Librosa audio processing available")
 except ImportError:
     LIBROSA_AVAILABLE = False
     logger.warning("Librosa not available. Audio processing will use fallback mode.")
+
 
 def load_audio_to_numpy(file_path, sr=22050):
     """
@@ -26,6 +28,7 @@ def load_audio_to_numpy(file_path, sr=22050):
         # WebM/Opus (and any other unsupported container) via PyAV + numpy
         import av
         import numpy as np
+
         container = av.open(file_path)
         stream = container.streams.audio[0]
         frames = []
@@ -46,15 +49,16 @@ def load_audio_to_numpy(file_path, sr=22050):
         logger.error(f"Error loading audio {file_path}: {e}")
         return None, sr
 
+
 def load_and_preprocess_audio(file_path, duration=3, sr=22050):
     """
     Load audio file, denoise (simple), and extract MFCC features.
-    
+
     Args:
         file_path: Path to the audio file
         duration: Maximum duration to process in seconds
         sr: Sample rate for processing
-        
+
     Returns:
         MFCC feature vector or mock features if librosa not available
     """
@@ -62,16 +66,17 @@ def load_and_preprocess_audio(file_path, duration=3, sr=22050):
         if not os.path.exists(file_path):
             logger.error(f"Audio file not found: {file_path}")
             return None
-        
+
         if LIBROSA_AVAILABLE:
             return _process_with_librosa(file_path, duration, sr)
         else:
             return _generate_mock_features(file_path)
-            
+
     except Exception as e:
         logger.error(f"Error processing audio: {e}")
         # Return fallback features instead of None to allow demo to continue
         return _generate_mock_features(file_path)
+
 
 def _process_with_librosa(file_path, duration, sr):
     """
@@ -85,37 +90,40 @@ def _process_with_librosa(file_path, duration, sr):
                 return _generate_mock_features(file_path)
         else:
             y, _ = librosa.load(file_path, sr=sr, duration=duration, mono=True)
-        
+
         if len(y) == 0:
             logger.warning("Empty audio file")
             return _generate_mock_features(file_path)
-        
+
         # Simple noise reduction (trim silence)
         y, _ = librosa.effects.trim(y)
-        
+
         if len(y) == 0:
             logger.warning("Audio file contains only silence")
             return _generate_mock_features(file_path)
-        
+
         # Pad or truncate to ensure consistent length
         target_length = int(sr * duration)
         if len(y) < target_length:
             y = np.pad(y, (0, target_length - len(y)))
         else:
             y = y[:target_length]
-        
+
         # Extract MFCCs
         mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
-        
+
         # Return mean of MFCCs (simple feature vector)
         features = np.mean(mfccs.T, axis=0)
-        
-        logger.info(f"Extracted MFCC features: shape={features.shape}, mean={np.mean(features):.2f}")
+
+        logger.info(
+            f"Extracted MFCC features: shape={features.shape}, mean={np.mean(features):.2f}"
+        )
         return features
-        
+
     except Exception as e:
         logger.error(f"Librosa processing failed: {e}")
         return _generate_mock_features(file_path)
+
 
 def _generate_mock_features(file_path):
     """
@@ -126,46 +134,51 @@ def _generate_mock_features(file_path):
         # Use file size and name to generate "random" but consistent features
         file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 1000
         file_hash = hash(file_path) % 100
-        
+
         # Generate 13 MFCC-like features with some variation
         np.random.seed(file_size % 10000 + file_hash)
-        
+
         # Base features with realistic MFCC-like distribution
-        base = np.array([
-            -5.0 + np.random.randn() * 10,   # First coefficient usually larger
-            np.random.randn() * 5,
-            np.random.randn() * 4,
-            np.random.randn() * 3,
-            np.random.randn() * 3,
-            np.random.randn() * 2.5,
-            np.random.randn() * 2.5,
-            np.random.randn() * 2,
-            np.random.randn() * 2,
-            np.random.randn() * 1.5,
-            np.random.randn() * 1.5,
-            np.random.randn() * 1,
-            np.random.randn() * 1,
-        ])
-        
+        base = np.array(
+            [
+                -5.0 + np.random.randn() * 10,  # First coefficient usually larger
+                np.random.randn() * 5,
+                np.random.randn() * 4,
+                np.random.randn() * 3,
+                np.random.randn() * 3,
+                np.random.randn() * 2.5,
+                np.random.randn() * 2.5,
+                np.random.randn() * 2,
+                np.random.randn() * 2,
+                np.random.randn() * 1.5,
+                np.random.randn() * 1.5,
+                np.random.randn() * 1,
+                np.random.randn() * 1,
+            ]
+        )
+
         # Add some variation based on file properties
         variation = (file_size / 10000) % 5
         base += variation
-        
-        logger.info(f"Generated mock features: shape={base.shape}, mean={np.mean(base):.2f}")
+
+        logger.info(
+            f"Generated mock features: shape={base.shape}, mean={np.mean(base):.2f}"
+        )
         return base
-        
+
     except Exception as e:
         logger.error(f"Mock feature generation failed: {e}")
         # Absolute fallback
         return np.random.randn(13) * 5
 
+
 def get_audio_duration(file_path):
     """
     Get the duration of an audio file.
-    
+
     Args:
         file_path: Path to the audio file
-        
+
     Returns:
         Duration in seconds, or None if unable to determine
     """

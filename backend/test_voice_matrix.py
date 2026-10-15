@@ -58,9 +58,13 @@ def run_one(file_path, filename, language, voice):
         "http_ok": response.ok,
         "status": payload.get("status") == "success",
         "translation_nonempty": bool(data.get("translation")),
-        "language_text": (is_devanagari(data.get("translation", "")) if language == "hi-IN"
-                          else is_ascii(data.get("translation", "")) if data.get("translation")
-                          else True),
+        "language_text": (
+            is_devanagari(data.get("translation", ""))
+            if language == "hi-IN"
+            else is_ascii(data.get("translation", ""))
+            if data.get("translation")
+            else True
+        ),
         "voice_echoed": data.get("voice") == voice,
         "tts_mp3": data.get("audio_url") is not None,
     }
@@ -71,7 +75,9 @@ def run_one(file_path, filename, language, voice):
         try:
             r = requests.get(f"{BACKEND_URL}{data['audio_url']}", timeout=60)
             tts_ok = f"{r.status_code}:{r.headers.get('Content-Type', '?')}:{len(r.content)}B"
-            checks["tts_serves_ok"] = r.status_code == 200 and "audio" in r.headers.get("Content-Type", "")
+            checks["tts_serves_ok"] = r.status_code == 200 and "audio" in r.headers.get(
+                "Content-Type", ""
+            )
         except Exception as e:
             checks["tts_serves_ok"] = False
             tts_ok = f"ERR:{str(e)[:60]}"
@@ -94,8 +100,12 @@ def run_one(file_path, filename, language, voice):
 
 def main():
     parser = argparse.ArgumentParser(description="Run the record x voice matrix test")
-    parser.add_argument("--limit", type=int, default=0, help="only run first N combinations")
-    parser.add_argument("--delay", type=float, default=0.2, help="seconds between calls")
+    parser.add_argument(
+        "--limit", type=int, default=0, help="only run first N combinations"
+    )
+    parser.add_argument(
+        "--delay", type=float, default=0.2, help="seconds between calls"
+    )
     parser.add_argument("--report", default="", help="path to write a Markdown report")
     args = parser.parse_args()
 
@@ -117,8 +127,10 @@ def main():
     if args.limit:
         combinations = combinations[: args.limit]
 
-    print(f"Matrix: {len(combinations)} runs "
-          f"({len(files)} records x {sum(len(v) for v in VOICES_BY_LANGUAGE.values())} voices)")
+    print(
+        f"Matrix: {len(combinations)} runs "
+        f"({len(files)} records x {sum(len(v) for v in VOICES_BY_LANGUAGE.values())} voices)"
+    )
     print(f"Backend: {BACKEND_URL}\n" + "-" * 70)
 
     results = []
@@ -126,12 +138,16 @@ def main():
         result = run_one(os.path.join(data_dir, f), f, lang, voice)
         results.append(result)
         mark = "OK " if result["ok"] else "FAIL"
-        print(f"[{mark}] {i:02d}/{len(combinations):02d} {f:25s} {lang:5s} {voice:8s} "
-              f"-> {result.get('animal')}/{result.get('emotion')} ({result.get('confidence')}) "
-              f"{result['elapsed_s']}s tts={result['tts_serves'][:40]}")
+        print(
+            f"[{mark}] {i:02d}/{len(combinations):02d} {f:25s} {lang:5s} {voice:8s} "
+            f"-> {result.get('animal')}/{result.get('emotion')} ({result.get('confidence')}) "
+            f"{result['elapsed_s']}s tts={result['tts_serves'][:40]}"
+        )
         if not result["ok"]:
-            print(f"        checks={json.dumps(result['checks'])}, http={result['http_status']}, "
-                  f"translation={result['translation']!r}")
+            print(
+                f"        checks={json.dumps(result['checks'])}, http={result['http_status']}, "
+                f"translation={result['translation']!r}"
+            )
         time.sleep(args.delay)
 
     passed = sum(1 for r in results if r["ok"])
@@ -140,7 +156,11 @@ def main():
     print(f"PASSED: {passed}/{len(results)}   TTS verified: {total_tts}/{len(results)}")
 
     if args.report:
-        out = os.path.join(repo_root, args.report) if not os.path.isabs(args.report) else args.report
+        out = (
+            os.path.join(repo_root, args.report)
+            if not os.path.isabs(args.report)
+            else args.report
+        )
         os.makedirs(os.path.dirname(out), exist_ok=True)
         with open(out, "w", encoding="utf-8") as fh:
             fh.write(make_report(results, passed, total_tts))

@@ -1,6 +1,7 @@
 import os
 from deepgram import DeepgramClient, PrerecordedOptions
 
+
 class DeepgramService:
     def __init__(self):
         self.api_key = os.getenv("DEEPGRAM_API_KEY")
@@ -25,17 +26,20 @@ class DeepgramService:
             payload = {
                 "buffer": buffer_data,
             }
-            
+
             options = PrerecordedOptions(
                 model="nova-2",
                 smart_format=True,
             )
 
-            response = self.client.listen.prerecorded.v("1").transcribe_file(payload, options)
+            response = self.client.listen.prerecorded.v("1").transcribe_file(
+                payload, options
+            )
             return response.results.channels[0].alternatives[0].transcript
-            
+
         except Exception as e:
             print(f"Deepgram Error: {e}")
             return "Error in transcription"
+
 
 deepgram_service = DeepgramService()

@@ -1,47 +1,56 @@
-FROM python:3.9-slim as builder
+# syntax=docker/dockerfile:1
+# ZooLingo backend — production image
+# Build: docker build -t zoolingo-backend ./backend
+
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    libsndfile1 \
-    ffmpeg \
-    gcc \
-    g++ \
+# System deps needed for audio/ML wheels
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libsndfile1 \
+        ffmpeg \
+        gcc \
+        g++ \
+        curl \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
-COPY requirements-lite.txt requirements.txt
-RUN pip install --no-cache-dir --user -r requirements.txt
+# Install Python dependencies (runtime + test in one image so CI can test)
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Production stage
-FROM python:3.9-slim
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Production stage — lean runtime image
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
-# Install runtime dependencies only
-RUN apt-get update && apt-get install -y \
-    libsndfile1 \
-    ffmpeg \
-    curl \
+# Runtime system deps only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libsndfile1 \
+        ffmpeg \
+        curl \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user first
+# Non-root user
 RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/temp_uploads /app/models && \
+    mkdir -p /app/temp_uploads /app/models /app/data && \
     chown -R appuser:appuser /app
 
-# Copy Python packages from builder to appuser's home
-COPY --from=builder /root/.local /home/appuser/.local
-RUN chown -R appuser:appuser /home/appuser/.local
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Make sure scripts in .local are usable
-ENV PATH=/home/appuser/.local/bin:$PATH
-
-# Copy application code
+# Copy application code (excluding dev-only artifacts via .dockerignore)
 COPY --chown=appuser:appuser . .
 
-# Switch to non-root user
 USER appuser
 
 # Health check
@@ -50,5 +59,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 EXPOSE 8000
 
-# Use production server
+ENV ENVIRONMENT=production \
+    PYTHONUNBUFFERED=1
+
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

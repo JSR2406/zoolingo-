@@ -130,13 +130,15 @@ def build_model(input_shape, num_classes):
     import tensorflow as tf
     from tensorflow.keras import layers, models
 
-    model = models.Sequential([
-        layers.Input(shape=input_shape),
-        layers.Dense(128, activation="relu"),
-        layers.Dropout(0.3),
-        layers.Dense(64, activation="relu"),
-        layers.Dense(num_classes, activation="softmax"),
-    ])
+    model = models.Sequential(
+        [
+            layers.Input(shape=input_shape),
+            layers.Dense(128, activation="relu"),
+            layers.Dropout(0.3),
+            layers.Dense(64, activation="relu"),
+            layers.Dense(num_classes, activation="softmax"),
+        ]
+    )
     model.compile(
         optimizer="adam",
         loss="sparse_categorical_crossentropy",
@@ -152,8 +154,12 @@ def train(epochs=50, batch_size=32, validation_split=0.2, use_elevenlabs=True):
     X_primary, y_primary = load_dataset()
     print(f"\nPrimary dataset: {len(X_primary)} samples")
 
-    X_elevenlabs, y_elevenlabs = load_elevenlabs_dataset() if use_elevenlabs else (None, None)
-    print(f"ElevenLabs dataset: {len(X_elevenlabs) if isinstance(X_elevenlabs, np.ndarray) else 0} samples")
+    X_elevenlabs, y_elevenlabs = (
+        load_elevenlabs_dataset() if use_elevenlabs else (None, None)
+    )
+    print(
+        f"ElevenLabs dataset: {len(X_elevenlabs) if isinstance(X_elevenlabs, np.ndarray) else 0} samples"
+    )
 
     if isinstance(X_elevenlabs, np.ndarray) and len(X_elevenlabs) > 0:
         X = np.concatenate([X_primary, X_elevenlabs])
@@ -176,7 +182,8 @@ def train(epochs=50, batch_size=32, validation_split=0.2, use_elevenlabs=True):
     model.summary()
 
     history = model.fit(
-        X, y,
+        X,
+        y,
         epochs=epochs,
         batch_size=batch_size,
         validation_split=validation_split,
@@ -215,6 +222,7 @@ def main():
     ):
         print("Generating ElevenLabs sounds for training...")
         import generate_elevenlabs_sounds
+
         if generate_elevenlabs_sounds.main() != 0:
             print("WARNING: ElevenLabs generation failed; continuing without it.")
 

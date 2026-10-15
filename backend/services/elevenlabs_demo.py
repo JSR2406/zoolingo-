@@ -89,15 +89,21 @@ def all_sounds():
     sounds = []
     for species in SPECIES:
         for emotion in EMOTION_KEYS:
-            sounds.append({
-                "species": species,
-                "animal": SPECIES_DISPLAY[species],
-                "emotion": emotion,
-                "label": EMOTION_DISPLAY[emotion],
-                "classifier_label": CLASSIFIER_LABEL[emotion],
-                "filename": f"{species}_{emotion}.wav",
-                "prompt": SOUND_PROMPTS[species][emotion],
-                "expected_en": EXPECTED_TRANSLATIONS[emotion]["en"].format(animal=SPECIES_DISPLAY[species]),
-                "expected_hi": EXPECTED_TRANSLATIONS[emotion]["hi"].format(animal=HINDI_ANIMAL[species]),
-            })
+            sounds.append(
+                {
+                    "species": species,
+                    "animal": SPECIES_DISPLAY[species],
+                    "emotion": emotion,
+                    "label": EMOTION_DISPLAY[emotion],
+                    "classifier_label": CLASSIFIER_LABEL[emotion],
+                    "filename": f"{species}_{emotion}.wav",
+                    "prompt": SOUND_PROMPTS[species][emotion],
+                    "expected_en": EXPECTED_TRANSLATIONS[emotion]["en"].format(
+                        animal=SPECIES_DISPLAY[species]
+                    ),
+                    "expected_hi": EXPECTED_TRANSLATIONS[emotion]["hi"].format(
+                        animal=HINDI_ANIMAL[species]
+                    ),
+                }
+            )
     return sounds
