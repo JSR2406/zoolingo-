@@ -11,6 +11,10 @@ backend/temp/
 *.wav
 *.h5
 
+# SQLite database (local dev only)
+petcare.db
+backend/petcare.db
+
 # Node
 node_modules/
 dist/
