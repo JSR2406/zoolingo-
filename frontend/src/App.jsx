@@ -32,6 +32,15 @@ const INTENSE_EMOTIONS = new Set([
 const LANGUAGE_LABELS = {
     'hi-IN': 'हिंदी (Hindi)',
     'en-IN': 'English',
+    // More Indian languages coming soon via SARVAM Samvaad:
+    // 'ta-IN': 'தமிழ் (Tamil)',
+    // 'bn-IN': 'বাংলা (Bengali)',
+    // 'mr-IN': 'मराठी (Marathi)',
+    // 'gu-IN': 'ગુજરાતી (Gujarati)',
+    // 'te-IN': 'తెలుగు (Telugu)',
+    // 'kn-IN': 'ಕನ್ನಡ (Kannada)',
+    // 'ml-IN': 'മലയാളം (Malayalam)',
+    // 'pa-IN': 'ਪੰਜਾਬੀ (Punjabi)',
 };
 
 function AppContent() {

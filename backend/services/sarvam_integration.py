@@ -16,17 +16,17 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
 class SarvamTTSClient:
-    """Client for SARVAM Text-to-Speech API (Bulbul v3) - English/Hindi MVP"""
+    """Client for SARVAM Text-to-Speech API (Bulbul v3) - English/Hindi"""
 
     BASE_URL = "https://api.sarvam.ai"
 
-    # Available voice speakers (bulbul:v3) - English + Hindi only for the MVP
+    # Available voice speakers (bulbul:v3) - English + Hindi
     SPEAKERS = {
         "hindi": {"female": "ritu", "male": "shubh", "child": "tanya"},
         "english": {"female": "neha", "male": "rohan"},
     }
 
-    # BCP-47 language codes - English + Hindi only for the MVP
+    # BCP-47 language codes - English + Hindi
     LANGUAGE_CODES = {"hindi": "hi-IN", "english": "en-IN"}
 
     def __init__(
@@ -198,8 +198,10 @@ class SarvamTTSClient:
         }
 
 
-# Focused voices per language for the MVP (Bulbul v3).
+# Focused voices per language (Bulbul v3).
 # Hindi: male=shubh, female=ritu, child=tanya; English: female=neha, male=rohan.
+# More Indian languages coming soon: Tamil, Bengali, Marathi, Gujarati,
+# Telugu, Kannada, Malayalam, Punjabi, Odia, Assamese, Urdu, Sanskrit.
 VOICES_BY_LANGUAGE = {
     "hi-IN": ["shubh", "ritu", "tanya"],
     "en-IN": ["neha", "rohan"],

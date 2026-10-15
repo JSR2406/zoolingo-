@@ -42,7 +42,7 @@ class Config:
         str(_REPO_ROOT / "data" / "test" / "elevenlabs"),
     )
 
-    # English + Hindi MVP (more languages can be added later)
+    # English + Hindi (more Indian languages can be added later via SARVAM)
     SUPPORTED_LANGUAGES = ["hi-IN", "en-IN"]
 
     # Demo audio
@@ -62,6 +62,12 @@ class Config:
     # Model Configuration
     MODEL_PATH = os.getenv("MODEL_PATH", "models/emotion_classifier.h5")
 
+    # Supabase (PostgreSQL) configuration for pet data storage
+    SUPABASE_URL = os.getenv("SUPABASE_URL")
+    SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+    SUPABASE_ENABLED = bool(SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)
+
     @classmethod
     def validate(cls):
         """Validate critical configuration"""
@@ -73,6 +79,10 @@ class Config:
         if cls.ENVIRONMENT == "production":
             if cls.ALLOWED_ORIGINS == ["*"]:
                 errors.append("ALLOWED_ORIGINS should not be '*' in production")
+            if cls.SUPABASE_ENABLED and not cls.SUPABASE_SERVICE_ROLE_KEY:
+                errors.append(
+                    "SUPABASE_SERVICE_ROLE_KEY required when SUPABASE_URL is set"
+                )
 
         if errors:
             raise ValueError(f"Configuration errors: {', '.join(errors)}")

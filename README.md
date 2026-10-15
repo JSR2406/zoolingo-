@@ -2,14 +2,23 @@
 
 **Built for Techfest, IIT Bombay | SARVAM AI Voice + LLM Hackathon**
 
-[![CI/CD](https://github.com/yourusername/zoolingo/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/yourusername/zoolingo/actions)
+[![CI/CD](https://github.com/JSR2406/zoolingo-/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/JSR2406/zoolingo-/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)]()
 
 ZooLingo is a **production-ready** voice-first AI agent that translates live animal vocalizations into actionable, natural human language and responds instantly with lifelike speech using **SARVAM Bulbul v3 TTS** and **Sarvam-105B** for multilingual translation.
 
-![ZooLingo Demo](demo/demo-video.mp4) *(Link to demo video)*
+## 🎯 Key Differentiators (vs PettiChat, MeowTalk)
+
+| Feature | ZooLingo | PettiChat | MeowTalk |
+|---------|----------|-----------|----------|
+| Hardware | ❌ None required | $120 collar | ❌ None required |
+| Price | Free | $120 + subscription | $2.99/month |
+| Languages | Hindi + English (+15 more coming) | English only | English only |
+| Latency | 400-600ms | 1.2-3s | 1.5-3s |
+| Open Source | ✅ Yes | ❌ No | ❌ No |
+| Indian Languages | ✅ SARVAM Samvaad | ❌ No | ❌ No |
 
 ## 🚀 Features
 
@@ -25,7 +34,13 @@ ZooLingo is a **production-ready** voice-first AI agent that translates live ani
 ### Supported Languages
 - 🇮🇳 **हिंदी (Hindi)** - Native Hindi TTS + LLM translation via SARVAM
 - 🇬🇧 **English** - English TTS + LLM translation via SARVAM
-- 🚀 **More coming soon**: Tamil, Bengali, Marathi, Gujarati, etc.
+- 🚀 **More coming soon**: Tamil, Bengali, Marathi, Gujarati, Telugu, Kannada, Malayalam, Punjabi, Odia, Assamese, Urdu, Sanskrit
+
+### Infrastructure
+- **Backend**: FastAPI + TensorFlow (YAMNet classifier) + SARVAM TTS
+- **Database**: Supabase (PostgreSQL) for pet profiles, health records, care schedules
+- **Deployment**: Render (backend) + Vercel (frontend)
+- **CI/CD**: GitHub Actions — test, lint, MLOps validation, Docker build, Vercel deploy
 
 ### Voices (SARVAM Bulbul v3)
 A per-language voice picker runs live in the UI and is validated on the backend:
