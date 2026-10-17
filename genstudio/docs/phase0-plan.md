@@ -65,6 +65,16 @@ in after latency/disk verification (26 GB bf16 + T5 ≈ 30 GB — fits 48 GB VRA
   the plain-generator film loop reached the nested `_gen_one_shot` GPU call and was rejected
   by the quota subsystem (not by a nested-call restriction). Friendly-error journey (J5)
   also confirmed. Full film smoke test (2 shots, 4 s each) queued for post-reset.
+- 2026-10-18 01:25 IST: **Quota window opened ~01:01 as predicted; suite run completed.**
+  J3 film smoke: server side fully worked (2 shots generated + persisted; assembled film
+  existed) but the API POST died with a client 403 on `/gradio_api/file=000.mp4`. Root
+  cause: gradio_client's legacy `is_file_obj` treats *any* dict containing a `"path"`
+  key as a downloadable FileData — our timing JSON hit it. Fix: timing dict key
+  renamed `path`→`file` (Space commit 8da952a). Free re-run via the resume path
+  (checkpoints, zero GPU) delivered the full tuple: gallery + summary + 8.08 s film.
+  J6 restart-resume verified in the same pass. Warm video 5.6 s, warm image 5.17 s.
+  Grant model refined: ×1.5 is the request-check multiplier only; deduction fits a
+  declared-sum or wall-time model (200 declared ran clean in one window)
 - 2026-10-17: Pending-implementation audit closed three gaps:
   (1) image tab now uses dynamic grants (60 cold / 25 warm) like video/film;
   (2) film resume made real — shots are re-fetched from the checkpoint dataset repo after
@@ -85,14 +95,14 @@ in after latency/disk verification (26 GB bf16 + T5 ≈ 30 GB — fits 48 GB VRA
   (bills 135 / 37.5) so the film smoke test (cold+warm ≈ 172.5) fits with slack.
   Pool reset confirmed for ~19:31 UTC Oct 17 (01:01 IST Oct 18).
 
-## Phase 1 checklist (MVP) — deployed, pending live verification
+## Phase 1 checklist (MVP) — deployed
 - [x] Single Space: https://huggingface.co/spaces/Theinvinvible24/genstudio (zero-a10g)
-- [x] Image tab: Z-Image-Turbo, batch 1-4, seed, sizes, gallery + timing JSON
-- [x] Video tab: LTX-Video 2B T2V, ≤8 s per shot, 3 resolution presets
-- [x] Long-form film tab: shot list → sequential shots → ffmpeg concat (CPU, no quota),
-      shot checkpointing to `Theinvinvible24/genstudio-films` dataset (resume-safe)
+- [x] Image tab: Z-Image-Turbo, batch 1-4, seed, sizes, gallery + timing JSON — **live-verified**
+- [x] Video tab: LTX-Video 2B T2V, ≤8 s per shot, 3 presets — **live-verified (5.6 s warm)**
+- [x] Long-form film tab: shot chain → ffmpeg concat → delivery — **live-verified 2026-10-18
+      (8.08 s smoke film; restart-resume from dataset repo proven at zero GPU cost)**
 - [x] Voice tab: Sarvam `bulbul:v4-flash` REST (needs `SARVAM_API_KEY` Space secret — pending user)
 - [x] Friendly quota/OOM errors; queue concurrency 1; dynamic required GPU grants
-- [ ] Live E2E: film smoke test (2 shots) — tomorrow after quota reset
+- [x] Live E2E: film smoke test (2 shots) — ✅ 2026-10-18
 - [ ] Voice live test once SARVAM key provided
 - [ ] Phase 2: Playwright E2E suite + p50/p95 latency report (genstudio/scripts/*)

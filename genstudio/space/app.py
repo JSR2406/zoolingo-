@@ -272,7 +272,10 @@ def film_loop(film_id, shot_lines, seconds, res_preset, steps, seed, persist, pr
             except Exception as e:
                 _raise_friendly(f"shot {i+1}", e)
         shot_paths.append(path)
-        walltime = {"shot": i + 1, "path": os.path.basename(path), "wall_s": wall, "source": src}
+        # NOTE: keys must NOT include "path" — gradio_client treats any dict with a
+        # "path" key as a downloadable FileData (legacy matcher) and the UI API call
+        # then dies at /gradio_api/file=000.mp4. Use "file" instead.
+        walltime = {"shot": i + 1, "file": os.path.basename(path), "wall_s": wall, "source": src}
         timings.append(walltime)
         gallery_items.append(path)
         dest = _shot_persist(film_id, i, path) if persist else "skipped"

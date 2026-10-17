@@ -14,10 +14,23 @@
 ## Results matrix (updated as runs land)
 | # | Task | Config | n | wall_s (observed) | Grant reserved | Notes |
 |---|---|---|---|---|---|---|
-| 1 | Image, cold boot | Z-Image-Turbo 1024², 8 steps | 1 | 6.4 gen (+39.8 build) | 45 | build inside first call |
-| 2 | Image, warm | 1024², 8 steps | 2 | 5.13, 5.28 | 45 | grant still 45 → tuning candidate |
-| 3 | Video, cold boot | LTX 2B 768×512, 97 f, 8 steps | 1 | 5.71 gen (+33.4 build) | 115 | dynamic grant fix pending test |
-| 4 | Film, 2 shots (smoke) | 2 × 4 s + ffmpeg concat | 0 | — | — | blocked by quota reset; queued |
+| 1 | Image, cold boot | Z-Image-Turbo 1024², 8 steps | 2 | 6.4 (+39.8 build); 5.17 (+53 client incl. build) | 60 | build inside first call |
+| 2 | Image, warm | 1024², 8 steps | 2 | 5.13, 5.28 | 25 | |
+| 3 | Video, cold boot | LTX 2B 768×512, 97 f, 8 steps | 1 | 5.71 (+33.4 build) | 115→90 | |
+| 4 | Video, warm | 768×512 4.04 s | 2 | 5.6 (16.5 client) | 25 | ✅ 2026-10-18 |
+| 5 | Film smoke, 2×4 s | cold build + 2 shots + CPU concat | 1 | server OK ~70 s; 8.08 s film delivered | 90+25 | ✅ J3 2026-10-18 |
+| 6 | Film resume after restart | 2 shots refetched from dataset repo | 1 | 0.0 GPU, assembly+delivery only | — | ✅ J6 core 2026-10-18 |
+
+## J3/J5/J6 outcome (2026-10-18 01:26 IST)
+- **J3 ✅** — 2×4 s shots generated, persisted to `Theinvinvible24/genstudio-films`,
+  assembled via ffmpeg concat, and the results tuple delivered to the API client.
+- **J6 ✅ (core)** — Space was restarted (new deploy) between shot generation and the
+  re-run; shots recovered from the checkpoint repo (`wall_s 0.0`, provenance
+  "checkpoint"), no GPU spent.
+- **Delivery bug (fixed)** — first assembled film POST suffered a client 403 on
+  `/gradio_api/file=000.mp4`: gradio_client's legacy `is_file_obj` downloads *any* dict
+  with a `"path"` key; our timing JSON `{"path": "000.mp4"}` looked like FileData.
+  Fixed by renaming the key to `"file"` (commit 8da952a).
 
 ## Grant accounting (billing rule measured 2026-10-17)
 ZeroGPU quota errors report `requested = declared duration × 1.5` against the daily pool:
@@ -37,6 +50,11 @@ that decides whether deduction is `declared` or `×1.5 requested`.
 | Image cold (60) | 90 | ~210 ÷ 90 = 2 cold boots, then |
 | Image warm (25) | 37.5 | ~3 more calls |
 | Film: cold shot + warm shots | 135 + 37.5 each | 2-shot smoke = 172.5 ✓ (slack 40) |
+
+**Empirical update 2026-10-18:** a full suite (film cold shot 90 + warm shot 25 + warm
+video 25 + cold image 60 = **200 declared**) ran with **no quota error** ⇒ ×1.5 is used
+for the *request check*, but actual deduction is lower (declared-sum 200 still fits; or
+deduction ≈ wall seconds ≈ 64). Refined model to verify with a longer drain test.
 
 ## Daily capacity at $0 (projection pending audit; grant=30 warm assumption)
 | Relay | Budget use | Throughput/day |

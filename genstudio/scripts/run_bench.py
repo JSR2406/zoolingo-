@@ -66,7 +66,7 @@ def run_suite(client):
     path = os.path.join(arts, f"suite_{time.strftime('%Y%m%d_%H%M%S')}.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=1, ensure_ascii=False)
-    print(f"saved: {path}", flush=True)
+    print(f"saved: genstudio/artifacts/{os.path.basename(path)}", flush=True)
 
 
 def main():
