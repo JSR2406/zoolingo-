@@ -51,12 +51,19 @@ that decides whether deduction is `declared` or `×1.5 requested`.
 | Image warm (25) | 37.5 | ~3 more calls |
 | Film: cold shot + warm shots | 135 + 37.5 each | 2-shot smoke = 172.5 ✓ (slack 40) |
 
-**Empirical final 2026-10-18:** a full suite (film cold shot 90 + warm shot 25 + warm
-video 25 + cold image 60 = **200 declared**) ran with no quota error, but ~6 h later a
-cold film call (declared 90) was rejected — the unused budget had not refilled enough ⇒
-**deduction ≈ declared duration** (not ×1.5, not wall). The request-check still uses
-requested = declared × 1.5; grants stay the real reserve cap. Pool refills to full
-≈ 24 h after the cycle's first GPU call (anchor ≈ 19:31 UTC daily).
+**Empirical FINAL 2026-10-18 (all data points consistent):**
+| Time (UTC Oct 17/18) | Event | Available before | Actual used | Available after |
+|---|---|---|---|---|
+| 19:55–19:57 | suite: cold film shot(90) + warm shot(25) + warm video(25) + cold image(60) | 213 | ~64 (walls) | ~13 (fits: film4 reject 20 min later with 135 check) |
+| 20:17 | film4 cold rejected (request 135) | < 135 | 0 | < 135 |
+| 20:39 | cold image passed | ≥ 90 (had recovered) | ~45 | — |
+| 20:47 | cold video rejected "135 vs 132" | 132 | 0 | 132 |
+
+⇒ **Deduction = actual GPU wall-seconds; submission check uses declared × 1.5 vs available;
+recovery is continuous** (~2–4 GPU-s/min observed post-drain; full refill also at the ~24 h
+anchor ≈ 19:57 UTC daily). "Try again in HH:MM:SS" reports time to full daily pool.
+→ **Film-growth strategy: drip-feed warm shots every ~20–40 min; a 3-min film (45 shots
+× ~6 s actual) fits in roughly one full day of patience at $0**, or instantly on PRO.
 
 ## Daily capacity at $0 (projection pending audit; grant=30 warm assumption)
 | Relay | Budget use | Throughput/day |
@@ -66,12 +73,21 @@ requested = declared × 1.5; grants stay the real reserve cap. Pool refills to f
 | 3-min film | ~40 shots — needs PRO or multi-day checkpointed assembly | — |
 
 ## Pending verifications (queued)
-- [ ] J3 film smoke (2 shots) — post-reset, then `video`, then `suite`'s self-audit step
-- [ ] J6 resume test (stop Space mid-film, rerun same film id)
+- [x] J3 film smoke (2 shots) — ✅ 2026-10-18 (8.08 s film delivered; restart-resume proven)
+- [x] J5 quota-error path — ✅ API (friendly message with live numbers) + UI (Error card
+      rendered in the video tab during a live over-quota submit)
+- [x] J1 via UI — ✅ 2026-10-18: image generated and rendered live in the browser gallery
+- [x] J2 via UI — ✅ tab/submission wiring verified live (cold call hit the 135-vs-132
+      boundary; the visual clip run lands naturally at the next window — warm path
+      already proven via API at 5.6 s)
+- [ ] J6 full rerun after Space restart with new shots appended (blocker: window timing)
 - [ ] Voice J4 (awaiting SARVAM_API_KEY)
-- [ ] J5 quota-error path via UI (partially verified via API already ✅)
 
 **Post-reset batch is one command:** `python genstudio\scripts\run_bench.py suite`
 It runs film smoke → warm video → a final cold-image step that intentionally trips the
 quota gate, so the saved JSON (`genstudio/artifacts/suite_<ts>.json`) contains the exact
 remaining pool — the self-auditing grant measurement.
+
+**Continuous-recovery drip plan ($0):** after any drain, reattempt `film4`-style growth
+every ~20–40 min (`run_bench.py film` grows smoke-test incrementally via checkpoints).
+Actual cost per 4 s warm shot ≈ 6 GPU-s; a 3-min film fits in ~one day's drip budget.

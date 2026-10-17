@@ -77,12 +77,21 @@ in after latency/disk verification (26 GB bf16 + T5 ≈ 30 GB — fits 48 GB VRA
   declared-sum or wall-time model (200 declared ran clean in one window). 
 - 2026-10-18 01:47 IST: **Pool model pinned** — growth run (film smoke-test 2→4 shots,
   cold 90 requested(×1.5)=135) was rejected after the earlier suite consumed ~200 declared,
-  ~6 h layer ⇒ remaining < 135 ⇒ **deduction ≈ declared**, not wall-time; pool refills to
+  ~6 h later ⇒ remaining < 135 ⇒ **deduction felt like declared** (corrected ~1 h later:
+  actually actual-wall-seconds, see the 02:45 entry); pool refills to
   full ≈ +24 h from the cycle's first call ⇒ next full window ≈ 19:31 UTC / 01:01 IST Oct 19.
   Free-rejected pass burned nothing (resume fetch + checkpoints unaffected).
   Capacity plan ($0): ~4-6 warm 4 s shots/day (declared 25 ⇒ check 37.5 each) ⇒ film grows
-  16-24 s/day ⇒ ~7-9 days to 3 min, OR one PRO day completes it in a single window.
-  Instrumentation: friendly quota error now surfaces ZeroGPU's "requested/left/retry" numbers.
+  ⇒ film grows 16-24 s/day ⇒ ~7-9 days to 3 min, OR one PRO day completes it in a single
+  window (also corrected down to ~1 day by the 02:45 recovery finding).
+  Instrumentation deployed (f669f18): friendly quota error surfaces ZeroGPU's
+  "requested/left/retry" numbers verbatim in the UI.
+- 2026-10-18 ~02:45 IST: **J1/J5 verified via the browser UI.** Image tab generated and
+  rendered a 1024² image live (neon Mumbai monsoon street; prompt kept in genstudio docs).
+  Video-tab submit rendered the Error card when the request checked 135 vs 132 available.
+  Pool model FINALIZED with four consistent data points: deduction = actual wall-seconds,
+  submission check = declared×1.5 ≤ available, recovery continuous (~2–4 s/min post-drain)
+  with a full-refill anchor ≈ 19:57 UTC daily. Film strategy: drip warm shots all day.
 - 2026-10-17: Pending-implementation audit closed three gaps:
   (1) image tab now uses dynamic grants (60 cold / 25 warm) like video/film;
   (2) film resume made real — shots are re-fetched from the checkpoint dataset repo after
