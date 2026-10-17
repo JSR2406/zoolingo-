@@ -19,17 +19,21 @@ ZooLingo is a **production-ready** voice-first AI agent that translates live ani
 | Latency | 400-600ms | 1.2-3s | 1.5-3s |
 | Open Source | ✅ Yes | ❌ No | ❌ No |
 | Indian Languages | ✅ SARVAM Samvaad | ❌ No | ❌ No |
+| **Honest ML** | ✅ Deterministic + ONNX | ❌ Black-box random | ❌ Black-box random |
+| **Confidence Gate** | ✅ Abstains below threshold | ❌ Always guesses | ❌ Always guesses |
 
 ## 🚀 Features
 
 ### Core Functionality
 - **Real-time Audio Processing**: Captures and analyzes animal sounds (WAV, MP3, OGG, FLAC, M4A, WebM)
-- **Deterministic Animal Classification**: Spectral-feature analysis (spectral centroid, zero-crossing rate, pitch modulation, energy bands, onset structure) distinguishes Dog vs Cat vs 13+ other animals — no random guessing
+- **Deterministic Animal Classification**: Spectral-feature analysis (spectral centroid, zero-crossing rate, pitch modulation, energy bands, onset structure) distinguishes Dog vs Cat vs 13+ other animals — deterministic rules, no random guessing
 - **Emotion & Intent Classification**: Detects emotions (Happy, Angry, Sad, Hungry, Pain, Excited, Scared, Curious, Playful, Calm, Demanding, Alert, and more) based on audio energy, pitch, and temporal structure
 - **Natural Language Translation**: Maps detected animal+emotion to human-readable text (deterministic per state — same sound = same translation)
 - **LLM Translation**: Sarvam-105B generates natural, context-aware translations
 - **Lifelike Voice Response**: Speaks the translation using **SARVAM Bulbul v3 TTS** (primary) with Murf fallback
 - **Modern UI**: Responsive React frontend with dynamic animal avatars and classification transparency panel
+- **Confidence Gate**: Automatically abstains ("couldn't tell") when confidence is below 0.6 threshold — never guesses
+- **Possible Interpretations**: Returns up to 3 alternative emotion interpretations with probabilities
 
 ### Supported Languages
 - 🇮🇳 **हिंदी (Hindi)** - Native Hindi TTS + LLM translation via SARVAM
@@ -37,7 +41,7 @@ ZooLingo is a **production-ready** voice-first AI agent that translates live ani
 - 🚀 **More coming soon**: Tamil, Bengali, Marathi, Gujarati, Telugu, Kannada, Malayalam, Punjabi, Odia, Assamese, Urdu, Sanskrit
 
 ### Infrastructure
-- **Backend**: FastAPI + TensorFlow (YAMNet classifier) + SARVAM TTS
+- **Backend**: FastAPI + deterministic heuristic classifier + optional TensorFlow/ONNX model + SARVAM TTS
 - **Database**: Supabase (PostgreSQL) for pet profiles, health records, care schedules
 - **Deployment**: Render (backend) + Vercel (frontend)
 - **CI/CD**: GitHub Actions — test, lint, MLOps validation, Docker build, Vercel deploy
@@ -65,24 +69,24 @@ A per-language voice picker runs live in the UI and is validated on the backend:
   `python scripts/download_real_audio.py` (set `REFRESH_ONLY=dog,cat` to re-fetch specific animals).
 
 ### Production Features
-- ✅ **Health Checks**: Automated monitoring for all services
+- ✅ **Health Checks**: Automated monitoring for all services (reports `ml_model: loaded` or `using_fallback`)
 - ✅ **Error Handling**: Comprehensive error handling and logging
 - ✅ **Security**: Input validation, file size limits, CORS configuration
-- ✅ **Testing**: 70%+ test coverage with pytest
+- ✅ **Testing**: pytest test suite with accuracy/calibration validation
 - ✅ **CI/CD**: Automated testing and deployment pipeline
 - ✅ **Docker**: Multi-stage builds with health checks
 - ✅ **Monitoring**: Structured logging and health endpoints
-- ✅ **Scalability**: Horizontal scaling ready with load balancing support
 
 ## 🛠️ Tech Stack
 
 ### Backend
 - **Framework**: Python 3.11, FastAPI
-- **Audio Processing**: Audio feature extraction (librosa optional)
-- **ML/AI**: Heuristic + TF fallback classification
+- **Audio Processing**: Audio feature extraction (librosa) — 195-dim feature vector
+- **ML/AI**: Deterministic heuristic classifier + optional TensorFlow/ONNX model fallback
 - **TTS**: SARVAM Bulbul v3 (primary), Murf Falcon (fallback)
 - **LLM**: SARVAM Sarvam-105B (translation)
 - **ASR**: Deepgram SDK (optional)
+- **Model Export**: Keras H5 → ONNX via `backend/export_model.py`
 
 ### Frontend
 - **Framework**: React 18, Vite
@@ -106,7 +110,7 @@ A per-language voice picker runs live in the UI and is validated on the backend:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/zoolingo.git
+   git clone https://github.com/JSR2406/zoolingo-.git
    cd zoolingo
    ```
 
@@ -159,6 +163,13 @@ docker-compose exec backend pytest tests/ -v --cov=. --cov-report=html
 open backend/htmlcov/index.html
 ```
 
+### Train + Evaluate Model
+```bash
+cd backend
+python train_eval.py
+```
+Trains with speaker-disjoint splits (no data leakage) and writes `results.json` with per-task macro-F1, baseline comparison, and Expected Calibration Error (ECE).
+
 ### Manual Testing
 ```bash
 # Test health endpoint
@@ -187,14 +198,17 @@ zoolingo/
 │   ├── config.py          # Configuration management
 │   ├── services/          # Audio, ML, TTS, ASR services
 │   │   ├── audio_processor.py
-│   │   ├── ai_classifier.py
+│   │   ├── ai_classifier.py   # Deterministic classifier + ONNX support
+│   │   ├── features.py      # 195-dim feature extractor
 │   │   ├── nlp_translator.py
 │   │   └── murf_integration.py
-│   ├── models/            # ML Models
+│   ├── models/            # ML Models (.h5, .onnx)
 │   ├── tests/             # Test suite
 │   │   ├── test_api.py
-│   │   └── test_services.py
+│   │   ├── test_services.py
+│   │   └── test_accuracy.py   # Welfare macro-F1 vs baseline + ECE
 │   ├── requirements.txt   # Python dependencies
+│   ├── requirements-ml.txt   # Optional ML dependencies
 │   ├── Dockerfile         # Backend container
 │   └── .env.example       # Environment template
 ├── frontend/              # React Application
@@ -213,6 +227,7 @@ zoolingo/
 │       └── ci-cd.yml      # CI/CD pipeline
 ├── docker-compose.yml     # Multi-container setup
 ├── .gitignore
+├── requirements.txt
 └── README.md
 ```
 
@@ -281,12 +296,13 @@ docker stats
 - ✅ **Code Quality**: Modular, documented, tested, and containerized
 - ✅ **Production Ready**: Health checks, monitoring, CI/CD, comprehensive docs
 - ✅ **Demo Ready**: Easy to deploy and test
+- ✅ **Honest ML**: No fabricated confidence, deterministic classification, confidence gate with abstention
 
 ## 📊 Performance
 
 - **API Response Time**: < 2s (p95)
 - **Uptime**: 99.9% target
-- **Test Coverage**: 70%+
+- **Test Coverage**: pytest test suite
 - **Container Startup**: < 40s
 
 ## 🔒 Security
@@ -349,5 +365,4 @@ Built with ❤️ for Techfest IIT Bombay
 
 **Status**: ✅ Production Ready  
 **Version**: 1.0.0  
-**Last Updated**: 2025-11-24
-
+**Last Updated**: 2026-10-18
