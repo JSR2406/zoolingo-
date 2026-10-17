@@ -3,7 +3,7 @@
 usage:
   python run_bench.py image
   python run_bench.py video
-  python run_bench.py film   # small 2-shot film (smoke test of chaining)
+  python run_bench.py film   # grow smoke-test film to 4 shots (2 reused via resume)
   python run_bench.py voice  # Sarvam TTS (server needs SARVAM_API_KEY secret)
   python run_bench.py suite  # ordered post-reset batch; ends with an over-quota
                              # probe so the JSON log contains exact pool accounting
@@ -87,10 +87,13 @@ def main():
             seconds=4, res_preset="landscape 768×512", steps=8, seed=7,
             api_name="/generate_video",
         )
-    elif which == "film":
+    elif which == "film4":
         res = client.predict(
             film_id="smoke-test",
-            shot_lines="A lone lighthouse on a cliff at dawn, waves crashing\nA pod of dolphins leaping offshore, golden light",
+            shot_lines="A lone lighthouse on a cliff at dawn, waves crashing\n"
+                       "A pod of dolphins leaping offshore, golden light\n"
+                       "A fishing boat cutting through golden swells toward the lighthouse\n"
+                       "Camera pulls back, dusk storm clouds gathering over the lighthouse, dramatic light",
             seconds=4, res_preset="landscape 768×512", steps=8, seed=7, persist=True,
             api_name="/generate_film",
         )

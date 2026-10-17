@@ -76,11 +76,17 @@ def _get(kind: str):
 def _quota_hint(e: Exception) -> str:
     m = str(e).lower()
     if "quota" in m or "exceeded" in m or "402" in m:
+        # keep the ZeroGPU numbers (requested vs left, retry clock) visible — they are
+        # the only way to observe the live pool; details: docs/latency-report.md
+        import re
+        raw = str(e)
+        spec = re.search(r"\(([^()]*requested[^()]*left)\).*?Try again in (\d+:\d+:\d+)", raw, re.I)
+        numbers = f" [{spec.group(1)} | Try again in {spec.group(2)}]" if spec else ""
         return ("Daily GPU quota exhausted — the free tier is ~3.5-5 GPU-minutes/day "
-                "(measured empirically: resets 24 h after your first GPU call of the day; "
+                "(measured: resets ~24 h after the cycle's first GPU call; "
                 "in-flight calls reserve their requested duration, so grants are kept minimal). "
-                "Upgrade to HF PRO for ~8x quota, or resume tomorrow — film shots are checkpointed "
-                "and can be assembled later.")
+                "Upgrade to HF PRO for ~8x quota, or resume later — film shots are checkpointed "
+                "and can be assembled later." + numbers)
     return ""
 
 

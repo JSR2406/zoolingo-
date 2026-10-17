@@ -74,7 +74,15 @@ in after latency/disk verification (26 GB bf16 + T5 ≈ 30 GB — fits 48 GB VRA
   (checkpoints, zero GPU) delivered the full tuple: gallery + summary + 8.08 s film.
   J6 restart-resume verified in the same pass. Warm video 5.6 s, warm image 5.17 s.
   Grant model refined: ×1.5 is the request-check multiplier only; deduction fits a
-  declared-sum or wall-time model (200 declared ran clean in one window)
+  declared-sum or wall-time model (200 declared ran clean in one window). 
+- 2026-10-18 01:47 IST: **Pool model pinned** — growth run (film smoke-test 2→4 shots,
+  cold 90 requested(×1.5)=135) was rejected after the earlier suite consumed ~200 declared,
+  ~6 h layer ⇒ remaining < 135 ⇒ **deduction ≈ declared**, not wall-time; pool refills to
+  full ≈ +24 h from the cycle's first call ⇒ next full window ≈ 19:31 UTC / 01:01 IST Oct 19.
+  Free-rejected pass burned nothing (resume fetch + checkpoints unaffected).
+  Capacity plan ($0): ~4-6 warm 4 s shots/day (declared 25 ⇒ check 37.5 each) ⇒ film grows
+  16-24 s/day ⇒ ~7-9 days to 3 min, OR one PRO day completes it in a single window.
+  Instrumentation: friendly quota error now surfaces ZeroGPU's "requested/left/retry" numbers.
 - 2026-10-17: Pending-implementation audit closed three gaps:
   (1) image tab now uses dynamic grants (60 cold / 25 warm) like video/film;
   (2) film resume made real — shots are re-fetched from the checkpoint dataset repo after

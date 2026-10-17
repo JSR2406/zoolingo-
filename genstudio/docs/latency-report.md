@@ -51,10 +51,12 @@ that decides whether deduction is `declared` or `×1.5 requested`.
 | Image warm (25) | 37.5 | ~3 more calls |
 | Film: cold shot + warm shots | 135 + 37.5 each | 2-shot smoke = 172.5 ✓ (slack 40) |
 
-**Empirical update 2026-10-18:** a full suite (film cold shot 90 + warm shot 25 + warm
-video 25 + cold image 60 = **200 declared**) ran with **no quota error** ⇒ ×1.5 is used
-for the *request check*, but actual deduction is lower (declared-sum 200 still fits; or
-deduction ≈ wall seconds ≈ 64). Refined model to verify with a longer drain test.
+**Empirical final 2026-10-18:** a full suite (film cold shot 90 + warm shot 25 + warm
+video 25 + cold image 60 = **200 declared**) ran with no quota error, but ~6 h later a
+cold film call (declared 90) was rejected — the unused budget had not refilled enough ⇒
+**deduction ≈ declared duration** (not ×1.5, not wall). The request-check still uses
+requested = declared × 1.5; grants stay the real reserve cap. Pool refills to full
+≈ 24 h after the cycle's first GPU call (anchor ≈ 19:31 UTC daily).
 
 ## Daily capacity at $0 (projection pending audit; grant=30 warm assumption)
 | Relay | Budget use | Throughput/day |
