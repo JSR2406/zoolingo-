@@ -1,0 +1,11 @@
+{
+  "name": "default-project",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MCP infrastructure dependencies for OpenCode agents",
+  "devDependencies": {
+    "@modelcontextprotocol/server-filesystem": "2026.8.31",
+    "@modelcontextprotocol/server-sequential-thinking": "2026.8.31",
+    "@playwright/mcp": "0.0.80"
+  }
+}

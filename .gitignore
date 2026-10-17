@@ -1,0 +1,30 @@
+# secrets — never commit
+.env
+.env.*
+!.env.example
+
+# generated media artifacts
+genstudio/artifacts/
+
+# mcp oauth tokens (stored outside the repo; belt and suspenders)
+mcp-auth.json
+
+# dependencies & build output
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# logs
+*.log
+npm-debug.log*
+
+# python bytecode
+__pycache__/
+
+# local browser-automation session junk
+.playwright-mcp/
+.vercel
