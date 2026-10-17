@@ -1,0 +1,25 @@
+# ZooLingo Backend - Lite Requirements
+# Use this for quick demo setup without heavy ML dependencies
+
+# Core API
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
+
+# HTTP Client
+requests==2.31.0
+
+# Data Processing
+numpy==1.24.3
+
+# Audio Processing (optional - for full functionality)
+# librosa==0.10.1
+# soundfile==0.12.1
+
+# Note: TensorFlow not included for faster setup
+# The app will use heuristic fallback for classification
+
+# Testing (optional)
+# pytest==7.4.3
+# httpx==0.25.2

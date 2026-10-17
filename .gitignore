@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # secrets — never commit
 .env
 .env.*
@@ -28,3 +29,26 @@ __pycache__/
 # local browser-automation session junk
 .playwright-mcp/
 .vercel
+=======
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+*.log
+temp_uploads/
+backend/temp/
+*.mp3
+*.wav
+*.h5
+
+# Node
+node_modules/
+dist/
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+>>>>>>> 2fcde242b8bd0f6f7736516ab400be646e8a7771

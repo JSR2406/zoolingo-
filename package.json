@@ -1,11 +1,12 @@
 {
-  "name": "default-project",
-  "version": "0.0.0",
+  "name": "zoolingo",
   "private": true,
-  "description": "MCP infrastructure dependencies for OpenCode agents",
-  "devDependencies": {
-    "@modelcontextprotocol/server-filesystem": "2026.8.31",
-    "@modelcontextprotocol/server-sequential-thinking": "2026.8.31",
-    "@playwright/mcp": "0.0.80"
+  "version": "1.0.0",
+  "scripts": {
+    "install:frontend": "npm --prefix frontend install --no-fund --no-audit",
+    "build:frontend": "npm --prefix frontend run build",
+    "build": "npm run install:frontend && npm run build:frontend",
+    "dev:frontend": "npm --prefix frontend run dev -- --port 3000",
+    "dev:backend": "python backend/app.py"
   }
 }

@@ -1,0 +1,35 @@
+# Local development artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.env
+*.log
+*.h5
+*.mp3
+*.wav
+*.csv
+temp_uploads/
+temp/
+htmlcov/
+.coverage
+coverage.xml
+.pytest_cache/
+.mypy_cache/
+.idea/
+.vscode/
+.DS_Store
+
+# Git
+.git/
+.github/
+
+# Docs / misc
+*.md
+*.sh
+*.ps1
+*.yml
+*.json
+Dockerfile
+render.yaml

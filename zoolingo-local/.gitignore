@@ -1,21 +1,46 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
+# secrets — never commit
 .env
+.env.*
+!.env.example
+
+# generated media artifacts
+genstudio/artifacts/
+
+# mcp oauth tokens (stored outside the repo; belt and suspenders)
+mcp-auth.json
+
+# dependencies & build output
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# logs
 *.log
-temp_uploads/
-backend/temp/
+npm-debug.log*
+
+# python bytecode
+__pycache__/
+
+# local browser-automation session junk
+.playwright-mcp/
+.vercel
+
+# ZooLingo media assets
 *.mp3
 *.wav
 *.h5
 *.onnx
 
-# Node
-node_modules/
-dist/
-.env.local
+# Python
+*.py[cod]
+*$py.class
+venv/
+temp_uploads/
+backend/temp/
 
 # OS
 .DS_Store
