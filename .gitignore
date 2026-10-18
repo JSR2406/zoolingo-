@@ -47,6 +47,9 @@ models/
 *.wav
 *.h5
 *.onnx
+*.db
+*.sqlite
+*.sqlite3
 
 # OS
 .DS_Store
