@@ -6,9 +6,15 @@ import sys
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import app
+from app import app as _app
 
-client = TestClient(app)
+
+@pytest.fixture(scope="session")
+def client():
+    """Create a test client for the FastAPI app."""
+    from fastapi.testclient import TestClient
+    with TestClient(_app) as test_client:
+        yield test_client
 
 
 def test_root_endpoint(client):
