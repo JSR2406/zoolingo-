@@ -1,9 +1,10 @@
-"""PetCare data layer — pure stdlib ``sqlite3`` (no SQLAlchemy, no ORM).
+"""PetCare data layer - pure stdlib sqlite3 (no SQLAlchemy, no ORM).
 
 Single connection guarded by a lock so FastAPI's default threadpool can share
-it safely. All helpers return ``sqlite3.Row`` objects (dict-like, support
-``row["column"]`` and ``dict(row)``).
+it safely. All helpers return sqlite3.Row objects (dict-like, support
+row["column"] and dict(row)).
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -26,8 +27,10 @@ _conn_lock = threading.RLock()
 # ---------------------------------------------------------------------------
 
 _SCHEMA = """
+-- Pets (owner-isolated via user_id)
 CREATE TABLE IF NOT EXISTS pets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
     name TEXT NOT NULL,
     species TEXT NOT NULL DEFAULT 'dog',
     breed TEXT NOT NULL DEFAULT '',
@@ -37,64 +40,103 @@ CREATE TABLE IF NOT EXISTS pets (
     microchip_id TEXT NOT NULL DEFAULT '',
     avatar_emoji TEXT NOT NULL DEFAULT '🐾',
     notes TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE INDEX IF NOT EXISTS idx_pets_user_id ON pets(user_id);
+
+-- Vaccination records
 CREATE TABLE IF NOT EXISTS vaccination_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     pet_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
     name TEXT NOT NULL,
     administered_on TEXT,
     next_due_on TEXT,
     administered_at TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
-    FOREIGN KEY (pet_id) REFERENCES pets (id)
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (pet_id) REFERENCES pets (id),
+    FOREIGN KEY (user_id) REFERENCES pets (user_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_vaccination_records_user_id ON vaccination_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_vaccination_records_pet_id ON vaccination_records(pet_id);
+
+-- Weight log
 CREATE TABLE IF NOT EXISTS weight_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     pet_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
     weight_kg REAL NOT NULL,
     logged_on TEXT NOT NULL DEFAULT (date('now')),
-    FOREIGN KEY (pet_id) REFERENCES pets (id)
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (pet_id) REFERENCES pets (id),
+    FOREIGN KEY (user_id) REFERENCES pets (user_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_weight_log_user_id ON weight_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_weight_log_pet_id ON weight_log(pet_id);
+
+-- Health records
 CREATE TABLE IF NOT EXISTS health_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     pet_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
     record_type TEXT NOT NULL DEFAULT 'note',
     title TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     recorded_on TEXT NOT NULL DEFAULT (date('now')),
-    FOREIGN KEY (pet_id) REFERENCES pets (id)
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (pet_id) REFERENCES pets (id),
+    FOREIGN KEY (user_id) REFERENCES pets (user_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_health_records_user_id ON health_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_health_records_pet_id ON health_records(pet_id);
+
+-- Care schedules
 CREATE TABLE IF NOT EXISTS care_schedules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     pet_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
     task TEXT NOT NULL,
     category TEXT NOT NULL DEFAULT 'care',
     frequency TEXT NOT NULL DEFAULT 'daily',
     time_of_day TEXT NOT NULL DEFAULT '',
     next_due_on TEXT,
     active INTEGER NOT NULL DEFAULT 1,
-    FOREIGN KEY (pet_id) REFERENCES pets (id)
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (pet_id) REFERENCES pets (id),
+    FOREIGN KEY (user_id) REFERENCES pets (user_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_care_schedules_user_id ON care_schedules(user_id);
+CREATE INDEX IF NOT EXISTS idx_care_schedules_pet_id ON care_schedules(pet_id);
+
+-- Vet contacts
 CREATE TABLE IF NOT EXISTS vet_contacts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
     name TEXT NOT NULL,
     phone TEXT NOT NULL DEFAULT '',
     address TEXT NOT NULL DEFAULT '',
     specialty TEXT NOT NULL DEFAULT 'general',
     hours TEXT NOT NULL DEFAULT '',
-    emergency INTEGER NOT NULL DEFAULT 0
+    emergency INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_vet_contacts_user_id ON vet_contacts(user_id);
 """
 
 _SEED = {
     "pets": [
         {
+            "user_id": "demo_user_001",
             "name": "Buddy",
             "species": "dog",
             "breed": "Golden Retriever",
@@ -106,6 +148,7 @@ _SEED = {
             "notes": "Energetic family dog. Loves fetch and swimming.",
         },
         {
+            "user_id": "demo_user_001",
             "name": "Mia",
             "species": "cat",
             "breed": "Domestic Shorthair",
@@ -147,28 +190,6 @@ _SEED = {
             "name": "Rabies",
             "administered_on": "2025-03-05",
             "next_due_on": "2026-03-05",
-        },
-    ],
-    "weight_log": [
-        {"pet_name": "Buddy", "weight_kg": 27.1, "logged_on": "2025-10-01"},
-        {"pet_name": "Buddy", "weight_kg": 27.5, "logged_on": "2025-11-01"},
-        {"pet_name": "Mia", "weight_kg": 4.0, "logged_on": "2025-10-01"},
-        {"pet_name": "Mia", "weight_kg": 4.2, "logged_on": "2025-11-01"},
-    ],
-    "health_records": [
-        {
-            "pet_name": "Buddy",
-            "record_type": "visit",
-            "title": "Annual wellness exam",
-            "description": "Healthy. Dental scale done.",
-            "recorded_on": "2025-01-10",
-        },
-        {
-            "pet_name": "Mia",
-            "record_type": "surgery",
-            "title": "Spay",
-            "description": "Recovered fully.",
-            "recorded_on": "2024-08-15",
         },
     ],
     "care_schedules": [
@@ -221,8 +242,12 @@ _SEED = {
 }
 
 
-def _pet_id_for(pet_name: str) -> int | None:
-    row = query_one("SELECT id FROM pets WHERE name = ?", (pet_name,))
+def _pet_id_for(pet_name: str, user_id: str) -> int | None:
+    """Look up pet ID by name and user_id (owner isolation)."""
+    row = query_one(
+        "SELECT id FROM pets WHERE name = ? AND user_id = ?",
+        (pet_name, user_id),
+    )
     return row["id"] if row else None
 
 
@@ -236,9 +261,10 @@ def seed_if_empty() -> None:
         try:
             for p in _SEED["pets"]:
                 cur.execute(
-                    "INSERT INTO pets (name, species, breed, gender, date_of_birth, weight_kg, "
+                    "INSERT INTO pets (user_id, name, species, breed, gender, date_of_birth, weight_kg, "
                     "microchip_id, avatar_emoji, notes) VALUES (?,?,?,?,?,?,?,?,?)",
                     (
+                        p["user_id"],
                         p["name"],
                         p["species"],
                         p["breed"],
@@ -252,10 +278,11 @@ def seed_if_empty() -> None:
                 )
             for v in _SEED["vaccination_records"]:
                 cur.execute(
-                    "INSERT INTO vaccination_records (pet_id, name, administered_on, next_due_on) "
-                    "VALUES (?,?,?,?)",
+                    "INSERT INTO vaccination_records (pet_id, user_id, name, administered_on, next_due_on) "
+                    "VALUES (?,?,?,?,?)",
                     (
-                        _pet_id_for(v["pet_name"]),
+                        _pet_id_for(v["pet_name"], "demo_user_001"),
+                        "demo_user_001",
                         v["name"],
                         v["administered_on"],
                         v["next_due_on"],
@@ -263,15 +290,21 @@ def seed_if_empty() -> None:
                 )
             for w in _SEED["weight_log"]:
                 cur.execute(
-                    "INSERT INTO weight_log (pet_id, weight_kg, logged_on) VALUES (?,?,?)",
-                    (_pet_id_for(w["pet_name"]), w["weight_kg"], w["logged_on"]),
+                    "INSERT INTO weight_log (pet_id, user_id, weight_kg, logged_on) VALUES (?,?,?,?)",
+                    (
+                        _pet_id_for(w["pet_name"], "demo_user_001"),
+                        "demo_user_001",
+                        w["weight_kg"],
+                        w["logged_on"],
+                    ),
                 )
             for h in _SEED["health_records"]:
                 cur.execute(
-                    "INSERT INTO health_records (pet_id, record_type, title, description, recorded_on) "
-                    "VALUES (?,?,?,?,?)",
+                    "INSERT INTO health_records (pet_id, user_id, record_type, title, description, recorded_on) "
+                    "VALUES (?,?,?,?,?,?)",
                     (
-                        _pet_id_for(h["pet_name"]),
+                        _pet_id_for(h["pet_name"], "demo_user_001"),
+                        "demo_user_001",
                         h["record_type"],
                         h["title"],
                         h["description"],
@@ -280,10 +313,11 @@ def seed_if_empty() -> None:
                 )
             for c in _SEED["care_schedules"]:
                 cur.execute(
-                    "INSERT INTO care_schedules (pet_id, task, category, frequency, time_of_day) "
-                    "VALUES (?,?,?,?,?)",
+                    "INSERT INTO care_schedules (pet_id, user_id, task, category, frequency, time_of_day) "
+                    "VALUES (?,?,?,?,?,?)",
                     (
-                        _pet_id_for(c["pet_name"]),
+                        _pet_id_for(c["pet_name"], "demo_user_001"),
+                        "demo_user_001",
                         c["task"],
                         c["category"],
                         c["frequency"],
@@ -292,9 +326,10 @@ def seed_if_empty() -> None:
                 )
             for vc in _SEED["vet_contacts"]:
                 cur.execute(
-                    "INSERT INTO vet_contacts (name, phone, address, specialty, hours, emergency) "
-                    "VALUES (?,?,?,?,?,?)",
+                    "INSERT INTO vet_contacts (user_id, name, phone, address, specialty, hours, emergency) "
+                    "VALUES (?,?,?,?,?,?,?)",
                     (
+                        "demo_user_001",
                         vc["name"],
                         vc["phone"],
                         vc.get("address", ""),
@@ -310,47 +345,6 @@ def seed_if_empty() -> None:
         logger.info("Seeded petcare demo data (Buddy + Mia)")
 
 
-# ---------------------------------------------------------------------------
-# Connection management
-# ---------------------------------------------------------------------------
-
-
-def _resolve_db_target() -> str:
-    """Pick the sqlite target for this runtime.
-
-    Order: PETCARE_DATABASE_URL env override -> Vercel/:memory: (read-only FS)
-    -> local file next to this module.
-    """
-    override = os.environ.get("PETCARE_DATABASE_URL")
-    if override:
-        return override
-    if (
-        os.environ.get("VERCEL") == "1"
-        or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
-        or os.environ.get("RENDER")
-    ):
-        return ":memory:"
-    return str(_DEFAULT_PATH)
-
-
-def get_conn() -> sqlite3.Connection:
-    """Return the process-shared connection, creating it on first use."""
-    global _conn
-    if _conn is None:
-        with _conn_lock:
-            if _conn is None:
-                db_target = _resolve_db_target()
-                conn = sqlite3.connect(db_target, check_same_thread=False)
-                conn.row_factory = sqlite3.Row
-                conn.execute("PRAGMA foreign_keys = ON")
-                _conn = conn
-                with _conn_lock:
-                    pass
-                _init_schema()
-                seed_if_empty()
-    return _conn
-
-
 def init_db() -> None:
     """Create tables + seed (call once at app startup)."""
     with _conn_lock:
@@ -359,46 +353,25 @@ def init_db() -> None:
         seed_if_empty()
 
 
-def _init_schema() -> None:
-    with _conn_lock:
-        get_conn().executescript(_SCHEMA)
-        get_conn().commit()
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    """Add missing columns to existing tables (migration helper)."""
+    # Pets table
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(pets)").fetchall()}
+    required_pets = {"id", "user_id", "name", "species", "breed", "gender", "date_of_birth", "weight_kg", "microchip_id", "avatar_emoji", "notes", "created_at", "updated_at"}
+    for col in required_pets:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE pets ADD COLUMN {col} TEXT")
 
+    # Vaccination records table
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(vaccination_records)").fetchall()}
+    required_vax = {"pet_id", "user_id", "name", "administered_on", "next_due_on", "administered_at", "notes", "created_at"}
+    for col in required_vax:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE vaccination_records ADD COLUMN {col} TEXT")
 
-def close_db() -> None:
-    global _conn
-    with _conn_lock:
-        if _conn is not None:
-            _conn.close()
-            _conn = None
-
-
-# ---------------------------------------------------------------------------
-# Query helpers
-# ---------------------------------------------------------------------------
-
-
-def query_all(sql: str, params: tuple = ()) -> list[sqlite3.Row]:
-    with _conn_lock:
-        return get_conn().execute(sql, params).fetchall()
-
-
-def query_one(sql: str, params: tuple = ()) -> sqlite3.Row | None:
-    rows = query_all(sql, params)
-    return rows[0] if rows else None
-
-
-def execute(sql: str, params: tuple = ()) -> int:
-    """Run a write statement; returns last insert rowid (0 if none)."""
-    with _conn_lock:
-        cur = get_conn().execute(sql, params)
-        get_conn().commit()
-        return cur.lastrowid or 0
-
-
-def delete_row(sql: str, params: tuple = ()) -> bool:
-    """Run a DELETE/UPDATE; returns True if a row was affected."""
-    with _conn_lock:
-        cur = get_conn().execute(sql, params)
-        get_conn().commit()
-        return cur.rowcount > 0
+    # Care schedules table
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(care_schedules)").fetchall()}
+    required_care = {"id", "pet_id", "user_id", "task", "category", "frequency", "time_of_day", "next_due_on", "active", "created_at", "updated_at"}
+    for col in required_care:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE care_schedules ADD COLUMN {col} TEXT")
