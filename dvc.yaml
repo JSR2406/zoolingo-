@@ -1,0 +1,53 @@
+# ZooLingo DVC Pipeline Configuration
+# Data Version Control for ML models and training data
+
+version: 1
+
+stages:
+  # Data ingestion stage
+  fetch-data:
+    cmd: python scripts/download_datasets.sh
+    deps:
+      - scripts/download_datasets.sh
+    outs:
+      - data/training
+      - data/test
+
+  # Feature extraction stage
+  extract-features:
+    cmd: python backend/scripts/extract_features.py
+    deps:
+      - data/training
+      - backend/scripts/extract_features.py
+    outs:
+      - data/features
+
+  # Model training stage
+  train-model:
+    cmd: python backend/train_eval.py
+    deps:
+      - data/features
+      - backend/train_eval.py
+      - backend/petcare/schemas.py
+    outs:
+      - models/emotion_conversion.onnx
+      - backend/results.json
+
+  # Evaluation stage
+  evaluate-model:
+    cmd: python backend/evaluate_model.py
+    deps:
+      - models/emotion_conversion.onnx
+      - data/features
+      - backend/evaluate_model.py
+    params:
+      - evaluation.confidence_threshold
+      - evaluation.min_accuracy
+    metrics:
+      - backend/evaluation_metrics.json:
+          cache: false
+
+# Pipeline configuration
+params:
+  evaluation.confidence_threshold: 0.6
+  evaluation.min_accuracy: 0.80

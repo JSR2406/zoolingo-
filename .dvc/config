@@ -1,0 +1,7 @@
+[core]
+    remote = myremote
+    analytics = false
+
+["remote "myremote"]
+    url = s3://zoolingo-data-bucket
+    region = us-east-1

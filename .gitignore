@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # secrets — never commit
 .env
 .env.*
@@ -25,30 +24,30 @@ npm-debug.log*
 
 # python bytecode
 __pycache__/
+*.py[cod]
+*$py.class
+venv/
 
 # local browser-automation session junk
 .playwright-mcp/
 .vercel
-=======
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-.env
-*.log
-temp_uploads/
-backend/temp/
+
+# DVC data versioning
+.dvc/cache/
+.dvc/tmp/
+.dvc/state.json
+.dvc/tmp/
+
+# DVC tracked data files (large files tracked by DVC, not Git)
+data/training/
+data/test/
+data/features/
+models/
 *.mp3
 *.wav
 *.h5
-
-# Node
-node_modules/
-dist/
-.env.local
+*.onnx
 
 # OS
 .DS_Store
 Thumbs.db
->>>>>>> 2fcde242b8bd0f6f7736516ab400be646e8a7771

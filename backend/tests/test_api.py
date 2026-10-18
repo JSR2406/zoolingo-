@@ -11,7 +11,7 @@ from app import app
 client = TestClient(app)
 
 
-def test_root_endpoint():
+def test_root_endpoint(client):
     """Test root endpoint returns correct response"""
     response = client.get("/")
     assert response.status_code == 200
@@ -21,7 +21,7 @@ def test_root_endpoint():
     assert "version" in data
 
 
-def test_health_check():
+def test_health_check(client):
     """Test health check endpoint"""
     response = client.get("/health")
     assert response.status_code == 200
@@ -31,7 +31,7 @@ def test_health_check():
     assert "timestamp" in data
 
 
-def test_config_endpoint():
+def test_config_endpoint(client):
     """Test configuration endpoint"""
     response = client.get("/api/config")
     assert response.status_code == 200
@@ -41,13 +41,13 @@ def test_config_endpoint():
     assert "allowed_extensions" in data
 
 
-def test_process_audio_no_file():
+def test_process_audio_no_file(client):
     """Test process audio endpoint without file"""
     response = client.post("/api/process-audio")
     assert response.status_code == 422  # Unprocessable Entity
 
 
-def test_process_audio_invalid_extension():
+def test_process_audio_invalid_extension(client):
     """Test process audio with invalid file extension"""
     files = {"file": ("test.txt", b"fake content", "text/plain")}
     response = client.post("/api/process-audio", files=files)
@@ -55,7 +55,7 @@ def test_process_audio_invalid_extension():
     assert "Invalid file type" in response.json()["detail"]
 
 
-def test_process_audio_valid_mock():
+def test_process_audio_valid_mock(client):
     """Test process audio with valid mock audio file"""
     # Create a minimal WAV file header (44 bytes)
     wav_header = (
