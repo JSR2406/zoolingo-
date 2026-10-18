@@ -6,7 +6,7 @@ All external modules are mocked BEFORE importing app to prevent import errors.
 """
 
 import sys
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 import os
 
 # Add parent directory to path so 'app' can be imported
@@ -14,6 +14,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # --- Mock ALL external dependencies BEFORE importing app ---
 # This prevents ImportError from any module that has missing dependencies
+
+from fastapi import APIRouter
 
 def _mock_module(name: str) -> MagicMock:
     """Create a MagicMock module with common FastAPI attributes."""
@@ -42,6 +44,15 @@ MOCK_MODULES = [
 # Register all mock modules BEFORE importing app
 for _mod_name in MOCK_MODULES:
     sys.modules[_mod_name] = _mock_module(_mod_name)
+
+# Special handling: petcare.router.petcare_router must be a real FastAPI Router
+# because app.include_router() expects a proper Router object
+import petcare.router as _petcare_router_mod
+_petcare_router_mod.petcare_router = APIRouter()
+
+# Also ensure petcare.database.init_db is a no-op mock
+import petcare.database as _petcare_db_mod
+_petcare_db_mod.init_db = MagicMock()
 
 # Now import app - all imports will resolve to mocks
 from app import app as fastapi_app  # noqa: E402
