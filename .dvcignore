@@ -1,0 +1,38 @@
+# ZooLingo DVC Ignore File
+# Files and directories to ignore in DVC tracking
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+*.log
+temp_uploads/
+backend/temp/
+
+# Node
+node_modules/
+dist/
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Media files (tracked via DVC)
+*.mp3
+*.wav
+*.h5
+*.onnx
+
+# Large data directories
+data/training/
+data/test/
+data/features/
+models/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp

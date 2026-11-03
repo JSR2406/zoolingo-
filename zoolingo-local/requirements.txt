@@ -1,0 +1,10 @@
+# ZooLingo backend - Vercel Python function requirements (slim, no heavy ML)
+fastapi==0.104.1
+python-multipart==0.0.6
+python-dotenv==1.0.0
+requests==2.31.0
+numpy==1.26.4
+starlette==0.27.0
+
+# Lightweight ONNX runtime for serverless deployment (no TensorFlow needed)
+onnxruntime==1.16.3
