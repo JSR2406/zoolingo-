@@ -35,9 +35,21 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
 if not SUPABASE_JWT_SECRET:
     logger.warning(
-        "SUPABASE_JWT_SECRET not set. Auth will reject all tokens. "
-        "Set it from Supabase Dashboard -> Project Settings -> API -> JWT Secret."
+        "SUPABASE_JWT_SECRET not set. Running in DEMO mode — "
+        "auth will accept a demo user. Set it from Supabase Dashboard "
+        "-> Project Settings -> API -> JWT Secret for production auth."
     )
+
+# Demo user for when Supabase isn't configured
+DEMO_USER_ID = "demo_user_001"
+DEMO_USER_PROFILE = {
+    "id": DEMO_USER_ID,
+    "email": "demo@zoolingo.app",
+    "plan": "free",
+    "conversions_used": 0,
+    "created_at": datetime.now(timezone.utc).isoformat(),
+    "reservations": {},
+}
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
@@ -118,11 +130,22 @@ async def get_current_user(
 ) -> Dict[str, object]:
     """
     Dependency that extracts and validates the current user from a Supabase
-    Bearer JWT.
-
-    Raises HTTPException(401) if no valid token is provided.
+    Bearer JWT. Falls back to a demo user when Supabase JWT secret is not
+    configured (demo/development mode).
     """
     if credentials is None:
+        if not SUPABASE_JWT_SECRET:
+            # Demo mode: return a demo user so petcare sections work
+            user = get_user_profile(DEMO_USER_ID)
+            if user is None:
+                user = create_user_profile(
+                    DEMO_USER_ID,
+                    DEMO_USER_PROFILE["email"],
+                    DEMO_USER_PROFILE["plan"],
+                )
+                user["conversions_used"] = DEMO_USER_PROFILE["conversions_used"]
+                user["created_at"] = DEMO_USER_PROFILE["created_at"]
+            return user
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
@@ -132,6 +155,16 @@ async def get_current_user(
     token = credentials.credentials
     user_id = get_user_id_from_token(token)
     if user_id is None:
+        if not SUPABASE_JWT_SECRET:
+            # Demo mode with invalid token — still return demo user
+            user = get_user_profile(DEMO_USER_ID)
+            if user is None:
+                user = create_user_profile(
+                    DEMO_USER_ID,
+                    DEMO_USER_PROFILE["email"],
+                    DEMO_USER_PROFILE["plan"],
+                )
+            return user
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",

@@ -9,6 +9,7 @@
       "config": {
         "includeFiles": [
           "backend/**",
+          "backend/.env",
           "demo_audio/**",
           "data/test/elevenlabs/**"
         ]

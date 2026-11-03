@@ -138,13 +138,13 @@ def generate_tts_audio(
 config.setup_logging()
 logger = logging.getLogger(__name__)
 
-# Validate configuration
+# Validate configuration (non-fatal on serverless — API keys are set via Vercel env vars)
 try:
     config.validate()
     logger.info("Configuration validated successfully")
 except ValueError as e:
     logger.warning(f"Configuration validation warning: {e}")
-    if config.ENVIRONMENT == "production":
+    if config.ENVIRONMENT == "production" and not SERVERLESS:
         raise
 
 # Initialize FastAPI app
@@ -671,20 +671,21 @@ async def list_elevenlabs_sounds():
     }
 
 
-# Serve static files for audio playback
-app.mount("/static", StaticFiles(directory=config.UPLOAD_DIR), name="static")
+# Serve static files for audio playback (only if directory exists; serverless FS is read-only)
+if os.path.isdir(config.UPLOAD_DIR):
+    app.mount("/static", StaticFiles(directory=config.UPLOAD_DIR), name="static")
 
 # Serve demo audio files (pre-generated animal sounds for the demo flow)
-os.makedirs(config.DEMO_AUDIO_DIR, exist_ok=True)
-app.mount(
-    "/demo-audio", StaticFiles(directory=config.DEMO_AUDIO_DIR), name="demo-audio"
-)
+if os.path.isdir(config.DEMO_AUDIO_DIR):
+    app.mount(
+        "/demo-audio", StaticFiles(directory=config.DEMO_AUDIO_DIR), name="demo-audio"
+    )
 
 # Serve ElevenLabs pre-generated dog/cat demo sounds
-os.makedirs(config.ELEVENLABS_DEMO_DIR, exist_ok=True)
-app.mount(
-    "/elevenlabs", StaticFiles(directory=config.ELEVENLABS_DEMO_DIR), name="elevenlabs"
-)
+if os.path.isdir(config.ELEVENLABS_DEMO_DIR):
+    app.mount(
+        "/elevenlabs", StaticFiles(directory=config.ELEVENLABS_DEMO_DIR), name="elevenlabs"
+    )
 
 if __name__ == "__main__":
     import uvicorn

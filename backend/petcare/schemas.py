@@ -185,3 +185,85 @@ class ExpertAsk(BaseModel):
     pet_id: Optional[int] = None
     question: str = Field(min_length=1, max_length=1000)
     conversation_id: Optional[int] = None
+
+
+# ---------------------------------------------------------------------------
+# Conversations
+# ---------------------------------------------------------------------------
+
+
+class ConversationBase(BaseModel):
+    pet_id: int
+    title: Optional[str] = None
+
+
+class ConversationCreate(ConversationBase):
+    pass
+
+
+class ConversationRename(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+
+
+class ConversationOut(ConversationBase):
+    id: int
+    user_id: str
+    title: str
+    created_at: Optional[dt.datetime] = None
+    updated_at: Optional[dt.datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ---------------------------------------------------------------------------
+# Messages
+# ---------------------------------------------------------------------------
+
+
+class MessageBase(BaseModel):
+    conversation_id: int
+    role: str = Field(min_length=1, max_length=20)  # 'user' or 'assistant'
+    content: str = Field(min_length=1, max_length=5000)
+
+
+class MessageCreate(MessageBase):
+    pass
+
+
+class MessageOut(MessageBase):
+    id: int
+    user_id: str
+    created_at: Optional[dt.datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ---------------------------------------------------------------------------
+# Voice conversions
+# ---------------------------------------------------------------------------
+
+
+class VoiceConversionBase(BaseModel):
+    pet_id: Optional[int] = None
+    conversation_id: Optional[int] = None
+    animal: str
+    emotion: str
+    interpretation: str
+    interpretation_score: Optional[float] = None
+    language: str = "en-IN"
+    status: str = "success"
+
+
+class VoiceConversionCreate(VoiceConversionBase):
+    pass
+
+
+class VoiceConversionOut(VoiceConversionBase):
+    id: int
+    user_id: str
+    created_at: Optional[dt.datetime] = None
+
+    class Config:
+        from_attributes = True
