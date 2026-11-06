@@ -262,14 +262,22 @@ async def health_check():
         },
     }
 
-    # Check database
-    try:
-        from petcare.database import get_conn
-        conn = get_conn()
-        conn.execute("SELECT 1")
-        health_status["services"]["database"] = "operational"
-    except Exception:
-        health_status["services"]["database"] = "degraded"
+    # Check database (Supabase or SQLite)
+    from petcare.database import _use_supabase, _supabase
+    if _use_supabase() and _supabase:
+        try:
+            # Test Supabase connectivity by fetching pets
+            _supabase.get_pets("health_check")
+            health_status["services"]["database"] = "operational (supabase)"
+        except Exception:
+            health_status["services"]["database"] = "degraded"
+    else:
+        try:
+            conn = get_conn()
+            conn.execute("SELECT 1")
+            health_status["services"]["database"] = "operational (sqlite)"
+        except Exception:
+            health_status["services"]["database"] = "degraded"
 
     # Check if model is loaded
     if hasattr(classifier, "model") and classifier.model is not None:

@@ -15,7 +15,34 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Supabase client for persistent storage (falls back to SQLite if not configured)
+try:
+    from backend.services.supabase_client import supabase_client as _supabase
+except Exception:
+    _supabase = None
+
 _DEFAULT_PATH = Path(__file__).resolve().parent / "petcare.db"
+
+
+def _use_supabase() -> bool:
+    """Return True if Supabase is configured and available."""
+    return _supabase is not None and _supabase.enabled
+
+
+def _normalize_rows(rows) -> list:
+    """Normalize Supabase response or sqlite rows to list of dicts."""
+    if rows is None:
+        return []
+    if isinstance(rows, list):
+        return [dict(r) if hasattr(r, "items") else dict(r) for r in rows]
+    return [dict(rows)] if hasattr(rows, "items") else []
+
+
+def _normalize_row(row):
+    """Normalize a single row to a dict or None."""
+    if row is None:
+        return None
+    return dict(row) if hasattr(row, "items") else dict(row)
 
 # The shared connection is created lazily and reused for the process lifetime.
 _conn = None
@@ -559,7 +586,11 @@ def get_conn() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Create tables + seed (call once at app startup)."""
+    """Create tables + seed (call once at app startup).
+    Skips SQLite schema if Supabase is configured (user runs SQL manually in Supabase)."""
+    if _use_supabase():
+        logger.info("Supabase configured — skipping SQLite schema creation")
+        return
     with _conn_lock:
         conn = get_conn()
         _init_schema()
@@ -624,18 +655,133 @@ def close_db() -> None:
 # ---------------------------------------------------------------------------
 
 
-def query_all(sql: str, params: tuple = ()) -> list[sqlite3.Row]:
+def _extract_table(sql: str) -> str | None:
+    """Extract table name from simple SQL (SELECT/INSERT/UPDATE/DELETE)."""
+    import re
+    m = re.search(r'(?:FROM|INTO|UPDATE|INTO|DELETE FROM)\s+(\w+)', sql, re.IGNORECASE)
+    return m.group(1) if m else None
+
+
+def _supabase_select(table: str, params: tuple) -> list | None:
+    """Route simple SELECT queries to Supabase client. Returns None if not handled."""
+    if not _use_supabase():
+        return None
+    client = _supabase
+    user_id = params[0] if params else None
+
+    try:
+        if table == "pets":
+            return client.get_pets(user_id or "default")
+        elif table == "vaccination_records":
+            # Get vaccinations for all pets of user — need pet IDs first
+            pets = client.get_pets(user_id or "default")
+            if not pets:
+                return []
+            all_vax = []
+            for p in pets:
+                all_vax.extend(client.get_vaccinations(p["id"]))
+            return all_vax
+        elif table == "weight_log":
+            pets = client.get_pets(user_id or "default")
+            if not pets:
+                return []
+            all_weights = []
+            for p in pets:
+                all_weights.extend(client.get_weight_logs(p["id"]))
+            return all_weights
+        elif table == "health_records":
+            pets = client.get_pets(user_id or "default")
+            if not pets:
+                return []
+            all_health = []
+            for p in pets:
+                all_health.extend(client.get_health_records(p["id"]))
+            return all_health
+        elif table == "care_schedules":
+            pets = client.get_pets(user_id or "default")
+            if not pets:
+                return []
+            all_care = []
+            for p in pets:
+                all_care.extend(client.get_care_schedules(p["id"]))
+            return all_care
+        elif table == "vet_contacts":
+            return client.get_vet_contacts()
+        elif table == "medication_schedules":
+            pets = client.get_pets(user_id or "default")
+            if not pets:
+                return []
+            all_meds = []
+            for p in pets:
+                all_meds.extend(client.get_medication_schedules(p["id"]))
+            return all_meds
+        elif table == "reminders":
+            return client.get_reminders(user_id or "default")
+    except Exception as e:
+        logger.warning(f"Supabase select failed for {table}: {e}")
+    return None
+
+
+def _supabase_execute(table: str, data: dict) -> int | None:
+    """Route INSERT queries to Supabase client. Returns new row id or None."""
+    if not _use_supabase():
+        return None
+    client = _supabase
+    try:
+        if table == "pets":
+            result = client.create_pet(data)
+            return result.get("id") if result else None
+        elif table == "vaccination_records":
+            result = client.create_vaccination(data.get("pet_id"), data)
+            return result.get("id") if result else None
+        elif table == "weight_log":
+            result = client.create_weight_log(data.get("pet_id"), data)
+            return result.get("id") if result else None
+        elif table == "health_records":
+            result = client.create_health_record(data.get("pet_id"), data)
+            return result.get("id") if result else None
+        elif table == "care_schedules":
+            result = client.create_care_schedule(data.get("pet_id"), data)
+            return result.get("id") if result else None
+        elif table == "vet_contacts":
+            result = client.create_vet_contact(data)
+            return result.get("id") if result else None
+        elif table == "medication_schedules":
+            result = client.create_medication_schedule(data.get("pet_id"), data)
+            return result.get("id") if result else None
+        elif table == "reminders":
+            result = client.create_reminder(data.get("user_id", "default"), data)
+            return result.get("id") if result else None
+    except Exception as e:
+        logger.warning(f"Supabase insert failed for {table}: {e}")
+    return None
+
+
+def query_all(sql: str, params: tuple = ()) -> list:
+    if _use_supabase():
+        table = _extract_table(sql)
+        if table and sql.strip().upper().startswith("SELECT"):
+            result = _supabase_select(table, params)
+            if result is not None:
+                return result
     with _conn_lock:
         return get_conn().execute(sql, params).fetchall()
 
 
-def query_one(sql: str, params: tuple = ()) -> sqlite3.Row | None:
+def query_one(sql: str, params: tuple = ()):
     rows = query_all(sql, params)
     return rows[0] if rows else None
 
 
 def execute(sql: str, params: tuple = ()) -> int:
     """Run a write statement; returns last insert rowid (0 if none)."""
+    if _use_supabase():
+        table = _extract_table(sql)
+        if table and sql.strip().upper().startswith("INSERT"):
+            # Build data dict from params — params order matches column order in SQL
+            result = _supabase_execute(table, {"params": list(params)})
+            if result is not None:
+                return result
     with _conn_lock:
         cur = get_conn().execute(sql, params)
         get_conn().commit()
@@ -644,6 +790,34 @@ def execute(sql: str, params: tuple = ()) -> int:
 
 def delete_row(sql: str, params: tuple = ()) -> bool:
     """Run a DELETE/UPDATE; returns True if a row was affected."""
+    if _use_supabase():
+        table = _extract_table(sql)
+        if table:
+            client = _supabase
+            try:
+                if table == "care_schedules" and params:
+                    client.complete_care_schedule(params[0])
+                    return True
+                elif table == "medication_schedules" and params:
+                    client.delete_medication_schedule(params[0])
+                    return True
+                elif table == "reminders" and params:
+                    client.delete_reminder(params[0])
+                    return True
+                elif table == "vet_contacts" and params:
+                    client.delete_vet_contact(params[0])
+                    return True
+                elif table == "health_records" and params:
+                    client.delete_health_record(params[0])
+                    return True
+                elif table == "vaccination_records" and params:
+                    client.delete_vaccination(params[0])
+                    return True
+                elif table == "weight_log" and params:
+                    client.delete_weight_log(params[0])
+                    return True
+            except Exception as e:
+                logger.warning(f"Supabase delete failed for {table}: {e}")
     with _conn_lock:
         cur = get_conn().execute(sql, params)
         get_conn().commit()
