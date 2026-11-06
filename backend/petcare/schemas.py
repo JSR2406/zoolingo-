@@ -152,6 +152,80 @@ class CareScheduleOut(CareScheduleBase):
 
 
 # ---------------------------------------------------------------------------
+# Medication schedules
+# ---------------------------------------------------------------------------
+
+
+class MedicationScheduleBase(BaseModel):
+    pet_id: int
+    medication_name: str = Field(min_length=1, max_length=200)
+    dosage: str = ""
+    frequency: str = "daily"
+    time_of_day: str = ""
+    next_due_on: Optional[dt.date] = None
+    active: bool = True
+
+
+class MedicationScheduleCreate(MedicationScheduleBase):
+    pass
+
+
+class MedicationScheduleUpdate(BaseModel):
+    medication_name: Optional[str] = None
+    dosage: Optional[str] = None
+    frequency: Optional[str] = None
+    time_of_day: Optional[str] = None
+    next_due_on: Optional[dt.date] = None
+    active: Optional[bool] = None
+
+
+class MedicationScheduleOut(MedicationScheduleBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+# ---------------------------------------------------------------------------
+# Reminders
+# ---------------------------------------------------------------------------
+
+
+class ReminderBase(BaseModel):
+    pet_id: Optional[int] = None
+    title: str = Field(min_length=1, max_length=200)
+    description: str = ""
+    kind: str = "medication"
+    target_date: Optional[dt.date] = None
+    delivered_at: str = ""
+    delivery_method: str = "app"
+    status: str = "pending"
+
+
+class ReminderCreate(ReminderBase):
+    pass
+
+
+class ReminderUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    kind: Optional[str] = None
+    target_date: Optional[dt.date] = None
+    delivered_at: Optional[str] = None
+    delivery_method: Optional[str] = None
+    status: Optional[str] = None
+
+
+class ReminderOut(ReminderBase):
+    id: int
+    user_id: str
+    medication_schedule_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ---------------------------------------------------------------------------
 # Vet contacts
 # ---------------------------------------------------------------------------
 

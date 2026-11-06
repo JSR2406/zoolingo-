@@ -198,7 +198,28 @@ async def log_requests(request: Request, call_next):
     duration = (datetime.now() - start_time).total_seconds()
     logger.info(f"Response: {response.status_code} - Duration: {duration:.2f}s")
 
+    # Metrics counter
+    path = request.url.path
+    METHOD_COUNT[path] = METHOD_COUNT.get(path, 0) + 1
+    STATUS_COUNT[response.status_code] = STATUS_COUNT.get(response.status_code, 0) + 1
+
     return response
+
+
+# Prometheus-style metrics endpoint
+METHOD_COUNT: dict = {}
+STATUS_COUNT: dict = {}
+
+
+@app.get("/metrics")
+def metrics():
+    """Simple metrics endpoint for monitoring."""
+    return {
+        "requests_by_endpoint": METHOD_COUNT,
+        "responses_by_status": STATUS_COUNT,
+        "total_requests": sum(METHOD_COUNT.values()),
+        "timestamp": datetime.now().isoformat(),
+    }
 
 
 @app.get("/")
@@ -241,11 +262,24 @@ async def health_check():
         },
     }
 
+    # Check database
+    try:
+        from petcare.database import get_conn
+        conn = get_conn()
+        conn.execute("SELECT 1")
+        health_status["services"]["database"] = "operational"
+    except Exception:
+        health_status["services"]["database"] = "degraded"
+
     # Check if model is loaded
     if hasattr(classifier, "model") and classifier.model is not None:
         health_status["services"]["ml_model"] = "loaded"
     else:
         health_status["services"]["ml_model"] = "using_fallback"
+
+    # Overall status
+    if any(v == "degraded" for v in health_status["services"].values()):
+        health_status["status"] = "degraded"
 
     return health_status
 

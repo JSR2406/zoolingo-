@@ -428,6 +428,206 @@ def delete_care_schedule(
 
 
 # ---------------------------------------------------------------------------
+# Medication schedules
+# ---------------------------------------------------------------------------
+
+
+@petcare_router.get("/medication-schedules", response_model=list[schemas.MedicationScheduleOut])
+def list_medication_schedules(
+    pet_id: Optional[int] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """List medication schedules for the authenticated user, optionally filtered by pet."""
+    user_id = str(current_user["id"])
+    if pet_id:
+        _get_pet_or_404(pet_id, user_id)
+        return [
+            dict(r)
+            for r in query_all(
+                "SELECT * FROM medication_schedules WHERE user_id = ? AND pet_id = ? ORDER BY active DESC, id",
+                (user_id, pet_id),
+            )
+        ]
+    return [
+        dict(r)
+        for r in query_all(
+            "SELECT * FROM medication_schedules WHERE user_id = ? ORDER BY active DESC, id",
+            (user_id,),
+        )
+    ]
+
+
+@petcare_router.post("/medication-schedules", response_model=schemas.MedicationScheduleOut, status_code=201)
+def create_medication_schedule(
+    payload: schemas.MedicationScheduleCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Create a medication schedule (owner-isolated)."""
+    user_id = str(current_user["id"])
+    _get_pet_or_404(payload.pet_id, user_id)
+    _id = execute(
+        "INSERT INTO medication_schedules (user_id, pet_id, medication_name, dosage, frequency, time_of_day, next_due_on, active) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        (
+            user_id,
+            payload.pet_id,
+            payload.medication_name,
+            payload.dosage,
+            payload.frequency,
+            payload.time_of_day,
+            payload.next_due_on.isoformat() if payload.next_due_on else None,
+            int(payload.active),
+        ),
+    )
+    return dict(query_one("SELECT * FROM medication_schedules WHERE id = ?", (_id,)))
+
+
+@petcare_router.put("/medication-schedules/{schedule_id}", response_model=schemas.MedicationScheduleOut)
+def update_medication_schedule(
+    schedule_id: int,
+    payload: schemas.MedicationScheduleUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update a medication schedule (owner-isolated)."""
+    user_id = str(current_user["id"])
+    row = query_one("SELECT user_id FROM medication_schedules WHERE id = ?", (schedule_id,))
+    if not row or row["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="Medication schedule not found")
+    sets = []
+    values = []
+    for f in ["medication_name", "dosage", "frequency", "time_of_day", "next_due_on", "active"]:
+        v = getattr(payload, f)
+        if v is not None:
+            if f == "next_due_on":
+                sets.append(f"{f} = ?")
+                values.append(v.isoformat())
+            elif f == "active":
+                sets.append(f"{f} = ?")
+                values.append(int(v))
+            else:
+                sets.append(f"{f} = ?")
+                values.append(v)
+    values.append(schedule_id)
+    if sets:
+        sets.append("updated_at = datetime('now')")
+        execute(
+            f"UPDATE medication_schedules SET {', '.join(sets)} WHERE id = ?",
+            tuple(values),
+        )
+    return dict(query_one("SELECT * FROM medication_schedules WHERE id = ?", (schedule_id,)))
+
+
+@petcare_router.delete("/medication-schedules/{schedule_id}", status_code=204)
+def delete_medication_schedule(
+    schedule_id: int, current_user: dict = Depends(get_current_user)
+):
+    """Delete a medication schedule (owner-isolated)."""
+    user_id = str(current_user["id"])
+    if not delete_row("DELETE FROM medication_schedules WHERE id = ? AND user_id = ?", (schedule_id, user_id)):
+        raise HTTPException(status_code=404, detail="Medication schedule not found")
+
+
+# ---------------------------------------------------------------------------
+# Reminders
+# ---------------------------------------------------------------------------
+
+
+@petcare_router.get("/reminders", response_model=list[schemas.ReminderOut])
+def list_reminders(
+    pet_id: Optional[int] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """List reminders for the authenticated user, optionally filtered by pet."""
+    user_id = str(current_user["id"])
+    if pet_id:
+        _get_pet_or_404(pet_id, user_id)
+        return [
+            dict(r)
+            for r in query_all(
+                "SELECT * FROM reminders WHERE user_id = ? AND pet_id = ? ORDER BY target_date DESC, id",
+                (user_id, pet_id),
+            )
+        ]
+    return [
+        dict(r)
+        for r in query_all(
+            "SELECT * FROM reminders WHERE user_id = ? ORDER BY target_date DESC, id",
+            (user_id,),
+        )
+    ]
+
+
+@petcare_router.post("/reminders", response_model=schemas.ReminderOut, status_code=201)
+def create_reminder(
+    payload: schemas.ReminderCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Create a reminder (owner-isolated)."""
+    user_id = str(current_user["id"])
+    if payload.pet_id:
+        _get_pet_or_404(payload.pet_id, user_id)
+    _id = execute(
+        "INSERT INTO reminders (user_id, pet_id, medication_schedule_id, title, description, kind, target_date, delivered_at, delivery_method, status) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (
+            user_id,
+            payload.pet_id,
+            payload.medication_schedule_id if hasattr(payload, 'medication_schedule_id') else None,
+            payload.title,
+            payload.description,
+            payload.kind,
+            payload.target_date.isoformat() if payload.target_date else None,
+            payload.delivered_at,
+            payload.delivery_method,
+            payload.status,
+        ),
+    )
+    return dict(query_one("SELECT * FROM reminders WHERE id = ?", (_id,)))
+
+
+@petcare_router.put("/reminders/{reminder_id}", response_model=schemas.ReminderOut)
+def update_reminder(
+    reminder_id: int,
+    payload: schemas.ReminderUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update a reminder (owner-isolated)."""
+    user_id = str(current_user["id"])
+    row = query_one("SELECT user_id FROM reminders WHERE id = ?", (reminder_id,))
+    if not row or row["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    sets = []
+    values = []
+    for f in ["title", "description", "kind", "target_date", "delivered_at", "delivery_method", "status"]:
+        v = getattr(payload, f)
+        if v is not None:
+            if f == "target_date":
+                sets.append(f"{f} = ?")
+                values.append(v.isoformat())
+            else:
+                sets.append(f"{f} = ?")
+                values.append(v)
+    values.append(reminder_id)
+    if sets:
+        sets.append("updated_at = datetime('now')")
+        execute(
+            f"UPDATE reminders SET {', '.join(sets)} WHERE id = ?",
+            tuple(values),
+        )
+    return dict(query_one("SELECT * FROM reminders WHERE id = ?", (reminder_id,)))
+
+
+@petcare_router.delete("/reminders/{reminder_id}", status_code=204)
+def delete_reminder(
+    reminder_id: int, current_user: dict = Depends(get_current_user)
+):
+    """Delete a reminder (owner-isolated)."""
+    user_id = str(current_user["id"])
+    if not delete_row("DELETE FROM reminders WHERE id = ? AND user_id = ?", (reminder_id, user_id)):
+        raise HTTPException(status_code=404, detail="Reminder not found")
+
+
+# ---------------------------------------------------------------------------
 # Vet contacts
 # ---------------------------------------------------------------------------
 
