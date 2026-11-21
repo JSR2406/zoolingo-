@@ -1,164 +1,35 @@
-# ZooLingo 🐾 - Voice Agent for Animals
+# ZooLingo
 
-**Built for Techfest, IIT Bombay | SARVAM AI Voice + LLM Hackathon**
+An experimental animal-audio demo built for the Techfest IIT Bombay SARVAM AI hackathon. It accepts audio, estimates sound categories, and can render a human-readable interpretation as speech.
 
-[![CI/CD](https://github.com/JSR2406/zoolingo-/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/JSR2406/zoolingo-/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
-[![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](https://zoolingo-deploy.vercel.app)
+## How it works
 
-**Live Demo:** [https://zoolingo-deploy.vercel.app](https://zoolingo-deploy.vercel.app)
+1. The React/Vite frontend records or selects a clip.
+2. FastAPI preprocesses the audio and calls classification services in [backend/services](backend/services).
+3. Classification and confidence checks feed an experimental interpretation. Configured speech providers can read the result aloud.
 
-ZooLingo is a **production-ready** voice-first AI agent that translates live animal vocalizations into actionable, natural human language using **SARVAM Bulbul v3 TTS** and **Sarvam-105B** for multilingual translation.
+The app’s emotion and intent labels are experimental. Treat them as demo output and consult a veterinarian for animal health concerns.
 
-## 🎯 Key Differentiators (vs PettiChat, MeowTalk)
+## Repository layout
 
-| Feature | ZooLingo | PettiChat | MeowTalk |
-|---------|----------|-----------|----------|
-| Hardware | ❌ None required | $120 collar | ❌ None required |
-| Price | Free | $120 + subscription | $2.99/month |
-| Languages | Hindi + English | English only | English only |
-| Open Source | ✅ Yes | ❌ No | ❌ No |
-| Indian Languages | ✅ SARVAM Samvaad | ❌ No | ❌ No |
-| **Honest ML** | ✅ Deterministic + ONNX | ❌ Black-box random | ❌ Black-box random |
-| **Confidence Gate** | ✅ Abstains below threshold | ❌ Always guesses | ❌ Always guesses |
+| Path | Purpose |
+| --- | --- |
+| [frontend/src](frontend/src) | Recording interface, results, and pet-care views |
+| [backend/app.py](backend/app.py) | FastAPI entry point |
+| [backend/services](backend/services) | Audio preprocessing, classifiers, and language/speech integrations |
+| [backend/petcare](backend/petcare) | Pet profiles and care features |
+| [backend/tests](backend/tests) | API and service tests |
+| [docker-compose.yml](docker-compose.yml) | Local two-service setup |
 
-## 🚀 Features
+## Run locally
 
-### Core Functionality
-- **Real-time Audio Processing**: Captures and analyzes animal sounds (WAV, MP3, OGG, FLAC, M4A, WebM)
-- **Deterministic Animal Classification**: Spectral-feature analysis distinguishes Dog vs Cat vs 13+ other animals
-- **Emotion & Intent Classification**: Detects emotions (Happy, Angry, Sad, Hungry, Pain, Excited, Scared, Curious, Playful, Calm, Demanding, Alert)
-- **Natural Language Translation**: Maps animal emotion to human-readable text
-- **LLM Translation**: Sarvam-105B for natural, context-aware translations
-- **Lifelike Voice Response**: SARVAM Bulbul v3 TTS (primary) with Murf fallback
-- **Confidence Gate**: Automatically abstains ("couldn't tell") below 0.6 confidence — never guesses
-- **Possible Interpretations**: Up to 3 alternative emotion interpretations with probabilities
+Install Docker with Compose, copy the example configuration, and set the provider keys needed for the speech features you intend to use.
 
-### Supported Languages
-- 🇮🇳 **हिंदी (Hindi)** - Native Hindi TTS + LLM translation via SARVAM
-- 🇬🇧 **English** - English TTS + LLM translation via SARVAM
-- 🚀 **More coming soon**: Tamil, Bengali, Marathi, Gujarati, Telugu, Kannada, Malayalam, Punjabi, Odia, Assamese, Urdu, Sanskrit
-
-### Infrastructure
-- **Backend**: FastAPI + deterministic heuristic classifier + optional TensorFlow/ONNX + SARVAM TTS
-- **Database**: Supabase (PostgreSQL) for pet profiles, healthcare records, care schedules
-- **Deployment**: Render (backend) + Vercel (frontend)
-- **CI/CD**: GitHub Actions — tests, linting, multi-arch Docker, Vercel deploy
-
-### Voices (SARVAM Bulbul v3)
-| Language | Voices | Default |
-| -------- | ------ | ------- |
-| hi-IN | `shubh`, `ritu`, `tanya` | `shubh` |
-| en-IN | `neha`, `rohan` | `neha` |
-
-### ElevenLabs Sound-Effect Demo
-12 pre-generated dog/cat sound effects (6 emotions × 2 species) served from `/api/demo/sounds`.
-
-## 🛠️ Tech Stack
-
-### Backend
-- **Framework**: Python 3.11, FastAPI
-- **Audio Processing**: librosa feature extraction (195-dim feature vector)
-- **ML/AI**: Deterministic heuristic classifier + optional TensorFlow/ONNX fallback
-- **TTS**: SARVAM Bulbul v3 (primary), Murf Falcon (fallback)
-- **LLM**: SARVAM Sarvam-105B (translation)
-- **ASR**: Deepgram SDK (optional)
-- **Model Export**: Keras H5 → ONNX via `backend/export_model.py`
-
-### Frontend
-- **Framework**: React 18, Vite
-- **Styling**: Tailwind CSS
-- **Animations**: Framer Motion
-- **Icons**: Lucide React
-
-### Infrastructure
-- **Containerization**: Docker, Docker Compose
-- **Web Server**: Nginx (frontend), Uvicorn (backend)
-- **CI/CD**: GitHub Actions
-- **Testing**: Pytest, Coverage
-
-## 📦 Quick Start
-
-### Prerequisites
-- Docker & Docker Compose
-- API Keys for SARVAM (required) and Murf (optional)
-
-### Installation
 ```bash
-# Clone the repository
-git clone https://github.com/JSR2406/zoolingo-.git
-cd zoolingo
-
-# Setup Environment Variables
 cp backend/.env.example backend/.env
-nano backend/.env   # Add your SARVAM_API_KEY
-
-# Run with Docker
-docker-compose up --build -d
-
-# Verify deployment
-curl http://localhost:8000/health
+docker compose up --build
 ```
 
-Access:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/health
+Open http://localhost:3000. The API exposes `/health` and `/docs` on port 8000. See [deployment notes](docs/DEPLOYMENT.md) for hosting details.
 
-## 🧪 Testing
-```bash
-cd backend
-pytest tests/ -v          # All tests
-pytest tests/ -v --cov=.  # With coverage
-python train_eval.py      # Train + evaluate ML model
-python test_voice_matrix.py --report "demo/voice_matrix_report.md"  # Voice quality matrix
-```
-
-## 🚀 Production Deployment
-
-### Quick Deploy (Docker Compose)
-```bash
-docker-compose up --build -d
-curl http://localhost:8000/health
-```
-
-### Cloud Deployment
-See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for AWS ECS, Google Cloud Run, Azure, Kubernetes.
-
-### Vercel (frontend)
-The frontend deploys automatically via Vercel CI/CD to: https://zoolingo-deploy.vercel.app
-
-## 🏆 Hackathon Compliance
-- ✅ SARVAM Bulbul v3 TTS (Hindi + English)
-- ✅ SARVAM-105B LLM translation
-- ✅ Deterministic ML (no random predictions)
-- ✅ Confidence gate (abstains below threshold)
-- ✅ No mandatory collar or hardware
-- ✅ No offline mode — cloud-based only
-
-## 🔒 Security
-- Environment-based configuration
-- Input validation, file size limits, CORS configuration
-- Non-root Docker containers
-- No hardcoded secrets
-
-## 🤝 Contributing
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
-
-## 📄 License
-MIT License
-
-## 👥 Team
-Built with ❤️ for Techfest IIT Bombay
-
-## 🙏 Acknowledgments
-- **SARVAM AI** for Bulbul v3 TTS & Sarvam-105B LLM
-- **Murf AI** for Falcon TTS fallback
-- **IIT Bombay** for hosting the hackathon
-- Open source community
+Sarvam AI provides language and speech integrations. The repository also includes integrations for Murf, Deepgram, and ElevenLabs.
