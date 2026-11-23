@@ -26,7 +26,7 @@ from services.sarvam_integration import (
 from services.sarvam_llm import llm_translator
 from services.elevenlabs_demo import all_sounds
 from services.elevenlabs_sfx import sfx_client
-from petcare.database import init_db
+from petcare.database import init_db, _use_supabase, _supabase
 from petcare.router import petcare_router
 from auth_router import router as auth_router
 from billing_router import router as billing_router
@@ -147,6 +147,19 @@ except ValueError as e:
     if config.ENVIRONMENT == "production" and not SERVERLESS:
         raise
 
+# Startup environment checks (non-fatal warnings)
+if config.ENVIRONMENT == "production":
+    if not config.SARVAM_API_KEY:
+        logger.warning("SARVAM_API_KEY not set — TTS/translation will be degraded")
+    if not config.ELEVENLABS_API_KEY:
+        logger.warning("ELEVENLABS_API_KEY not set — demo sound effects will be unavailable")
+    if not config.MURF_API_KEY:
+        logger.warning("MURF_API_KEY not set — TTS fallback unavailable")
+    if not config.SUPABASE_URL:
+        logger.warning("SUPABASE_URL not set — using in-memory SQLite (data resets on cold start)")
+    if not config.SUPABASE_JWT_SECRET:
+        logger.warning("SUPABASE_JWT_SECRET not set — running in demo auth mode")
+
 # Initialize FastAPI app
 app = FastAPI(
     title="ZooLingo API",
@@ -263,7 +276,6 @@ async def health_check():
     }
 
     # Check database (Supabase or SQLite)
-    from petcare.database import _use_supabase, _supabase
     if _use_supabase() and _supabase:
         try:
             # Test Supabase connectivity by fetching pets
