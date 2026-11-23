@@ -15,6 +15,8 @@ import Dashboard from './pages/Dashboard';
 import Pets from './pages/Pets';
 import Health from './pages/Health';
 import CareSchedules from './pages/CareSchedules';
+import MedicationSchedules from './pages/MedicationSchedules';
+import Reminders from './pages/Reminders';
 import VetDirectory from './pages/VetDirectory';
 import Expert from './pages/Expert';
 import Pricing from './pages/Pricing';
@@ -579,6 +581,8 @@ function App() {
                     <Route path="/pets" element={<Pets />} />
                     <Route path="/health" element={<Health />} />
                     <Route path="/care-schedules" element={<CareSchedules />} />
+                    <Route path="/medication-schedules" element={<MedicationSchedules />} />
+                    <Route path="/reminders" element={<Reminders />} />
                     <Route path="/vet-directory" element={<VetDirectory />} />
                     <Route path="/expert" element={<Expert />} />
                     <Route path="/pricing" element={<Pricing />} />
