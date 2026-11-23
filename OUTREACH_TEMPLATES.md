@@ -20,7 +20,7 @@ sovereign AI stack — Bulbul v3 TTS and Sarvam-105B LLM — with FastAPI +
 TensorFlow/YAMNet for deterministic dog/cat/13+ animal classification, emotion &
 intent detection, and Hindi/English (+15 more Indian languages planned) translation.
 
-Live demo: https://zoolingo-deploy.vercel.app
+Live demo: https://zoolingo-local.vercel.app
 GitHub: https://github.com/JSR2406/zoolingo-
 
 We're offering a **paid research internship** with the following terms:
@@ -112,7 +112,7 @@ I wanted to follow up on my note about ZooLingo — an open-source (MIT) voice-A
 that translates animal vocalizations into human language, built on SARVAM's Bulbul v3
 TTS and Sarvam-105B LLM.
 
-Live demo: https://zoolingo-deploy.vercel.app
+Live demo: https://zoolingo-local.vercel.app
 GitHub: https://github.com/JSR2406/zoolingo-
 
 We're offering a **paid research internship** with full open-source contribution rights — the intern can fork, modify, and own PRs to the project. Research areas include audio classification, bioacoustics, multilingual NLP translation (Hindi/English + 15 more), and TTS pipeline work.

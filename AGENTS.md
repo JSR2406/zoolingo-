@@ -5,8 +5,7 @@
 ZooLingo is an open-source (MIT) voice-first AI agent that translates animal vocalizations into human language, built for Techfest IIT Bombay + SARVAM AI Hackathon.
 
 **Live Demo:** https://zoolingo-deploy.vercel.app  
-**Current Deploy:** https://zoolingo-local.vercel.app  
-**GitHub:** https://github.com/JSR2406/zoolingo-
+**Current Deploy:** https://zoolingo-local.vercel.app
 
 ## Tech Stack
 

@@ -12,9 +12,9 @@
 | **Tech** | FastAPI + TensorFlow/YAMNet + SARVAM Bulbul v3 TTS + Sarvam-105B LLM; React/Vite frontend |
 | **License** | MIT (open source) — full freedom to fork, modify, contribute |
 | **GitHub** | https://github.com/JSR2406/zoolingo- |
-| **Live Demo** | https://zoolingo-deploy.vercel.app |
+| **Live Demo** | https://zoolingo-local.vercel.app |
 | **Role** | Paid Research Intern |
-| **Work** | Audio classification (dog/cat/13+ animals), emotion & intent detection, NLP translation (Hindi/English + Indian languages), TTS pipeline, pet-care platform features |
+| **Work** | Audio classification (dog/cat/13+ animals), emotion & intent detection, NLP translation (Hindi/English + Indian languages), TTS pipeline, pet-care platform features (medication schedules, reminders, health records, vet directory) |
 | **Key perk** | Open-source contribution; intern can make necessary changes, publish, and own PRs |
 
 ---
